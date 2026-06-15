@@ -51,11 +51,11 @@ The dev stack uses fixed credentials for convenience. **Never use these in produ
 `docker/Dockerfile` is a multi-stage build:
 
 ```
-base        node:22-slim + pnpm
+base        node:26-slim + pnpm
 deps        pnpm install --frozen-lockfile
 dashboard-builder   Vite build → apps/backend/public
 backend-builder     tsup build → apps/backend/dist
-runtime     node:22-slim + only production artifacts
+runtime     node:26-slim + only production artifacts
 ```
 
 Build the image:

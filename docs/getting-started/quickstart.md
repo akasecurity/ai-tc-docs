@@ -4,7 +4,7 @@ This guide takes you from zero to a working AKA installation with the Claude Cod
 
 ## Prerequisites
 
-- **Node.js 22+** and **pnpm 10+**
+- **Node.js 26+** and **pnpm 10+**
 - **Claude Code** installed and signed in
 - **Docker** (optional — needed for the Postgres dev stack)
 
