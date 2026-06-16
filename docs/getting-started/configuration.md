@@ -45,10 +45,27 @@ The `MODE` variable selects which schema is validated and which features are ena
 
 ### Postgres mode
 
-| Variable          | Default | Description                                                                                    |
-| ----------------- | ------- | ---------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`    | —       | **Required.** PostgreSQL connection string. Example: `postgresql://user:pass@host:5432/dbname` |
-| `AKA_LOCAL_TOKEN` | —       | **Required (dev mode).** Bearer token for dev-mode auth stub                                   |
+| Variable          | Default | Description                                                                                                                                                                                            |
+| ----------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`    | —       | **Required.** PostgreSQL connection string. Must target the non-superuser runtime role `aka_app` (see [Postgres roles](#postgres-roles) below). Example: `postgresql://aka_app:akaapppw@host:5432/aka` |
+| `AKA_LOCAL_TOKEN` | —       | **Required (dev mode).** Bearer token for dev-mode auth stub                                                                                                                                           |
+
+### Postgres roles
+
+AKA uses two distinct Postgres roles to keep schema ownership separate from runtime access and to ensure `FORCE ROW LEVEL SECURITY` is never bypassed.
+
+| Role      | Type                                      | Purpose                                                                                                                                                                             |
+| --------- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `aka`     | Owner (superuser in the Docker image)     | Runs DDL and migrations (`CREATE TABLE`, `ALTER TABLE`, etc.). Because Postgres superusers bypass `FORCE RLS` unconditionally, this role is **never** used for application queries. |
+| `aka_app` | Non-superuser (`NOSUPERUSER NOBYPASSRLS`) | Runtime role the application and integration tests connect as. Subject to all RLS policies. `DATABASE_URL` must point at this role.                                                 |
+
+**Why two roles?** Postgres superusers bypass `FORCE ROW LEVEL SECURITY` regardless of the policy definition. If the application connected as `aka` (the owner/superuser created by the Docker image), RLS would enforce nothing and rows from one tenant would be visible to any other. `aka_app` — with `NOSUPERUSER NOBYPASSRLS` — is the only role for which the `app.tenant_id` GUC-based policies actually fire.
+
+**Local dev and CI**: the file `docker/postgres-init/01-app-role.sql` is mounted into `/docker-entrypoint-initdb.d/` of the Postgres container. It runs once on first init, creating `aka_app` and setting default privileges so every table `aka` creates later is automatically accessible to `aka_app`.
+
+**Existing volumes**: init scripts in `/docker-entrypoint-initdb.d/` only run when the data directory is **empty**. If you ran the dev stack before this role existed, your `postgres-dev-data` volume already has data, so the script is skipped and you will see `role "aka_app" does not exist`. Recreate the volume to pick it up with `docker compose -f docker/docker-compose.dev.yml down -v` (this deletes local dev data), then start the stack again.
+
+**Hosted deployments**: `aka_app`'s password (`akaapppw`) is for local dev and CI only. In production, inject the credentials via your managed secret provider and set `DATABASE_URL` accordingly — never commit production credentials.
 
 ### Plugin variables
 
@@ -78,7 +95,9 @@ These are read by `apps/plugin-claude-code` (not the backend). Set them in the s
     ```bash
     MODE=dev
     STORAGE_DRIVER=postgres
-    DATABASE_URL=postgresql://aka:akadev@postgres:5432/aka
+    # Connect as the non-superuser runtime role so FORCE RLS is active.
+    # The owner role (aka) is used only for migrations, never for runtime queries.
+    DATABASE_URL=postgresql://aka_app:akaapppw@postgres:5432/aka
     AKA_LOCAL_TOKEN=devtoken123456789
     PORT=4000
     MIGRATE_ON_START=true
