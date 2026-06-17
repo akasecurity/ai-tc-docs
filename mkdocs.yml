@@ -71,6 +71,7 @@ nav:
   - Detection Rules:
       - Writing Rules: rules/writing-rules.md
       - Built-in Rules: rules/built-in.md
+      - Publishing: rules/publishing.md
   - API Reference: api/reference.md
   - Deployment:
       - Local Mode: deployment/local.md
