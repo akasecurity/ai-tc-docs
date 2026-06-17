@@ -5,7 +5,8 @@
 ```
 ai-control-plane/
 ├── apps/
-│   ├── backend/          Fastify 5 API server
+│   ├── backend/          Fastify 5 API server (per-customer control plane)
+│   ├── registry/         Fastify 5 global rule marketplace (cross-tenant, public read)
 │   ├── dashboard/        React 19 + Vite SPA
 │   ├── docs/             This MkDocs site
 │   └── plugin-claude-code/  Claude Code hook scripts
@@ -20,7 +21,8 @@ ai-control-plane/
 │   ├── core-pii/         Email + SSN rules with fixtures
 │   └── secrets/          AWS key + GitHub PAT rules with fixtures
 ├── tools/
-│   └── migrator/         CLI for applying DB migrations
+│   ├── migrator/         CLI for applying DB migrations
+│   └── rules-publisher/  CLI that publishes rules/ packs to the registry
 ├── skills/
 │   ├── backend-conventions/SKILL.md
 │   └── write-detection-rule/SKILL.md

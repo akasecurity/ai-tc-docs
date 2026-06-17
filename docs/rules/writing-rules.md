@@ -98,6 +98,18 @@ rules/
 }
 ```
 
+`version` is a semver string and is the unit of publishing: the [rule marketplace](publishing.md)
+treats each published `(pack, version)` as immutable. Bump it whenever you change a rule's content.
+
+The following manifest fields are optional and surface as attribution on a published pack:
+
+| Field         | Type                         | Purpose                               |
+| ------------- | ---------------------------- | ------------------------------------- |
+| `description` | string                       | One-line summary shown in the catalog |
+| `author`      | `{ name, email?, url? }`     | Who authored/maintains the pack       |
+| `license`     | string (SPDX id, e.g. `MIT`) | Usage terms                           |
+| `sourceUrl`   | string (URL)                 | Link to the pack's source             |
+
 ## Fixture format
 
 Every rule file **must** have a corresponding fixture file in `fixtures/<rule-name>.json`. CI rejects rules without fixtures.
