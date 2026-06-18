@@ -2,20 +2,36 @@
 
 All API routes are served by `apps/backend` on port 4000 (default). The current auth scheme is a Bearer token that must match `AKA_LOCAL_TOKEN`.
 
+## Interactive docs (OpenAPI)
+
+The backend generates an OpenAPI 3.1 spec directly from the `@aka/schema` Zod
+contracts — the same schemas used to validate requests and serialize responses,
+so the spec never drifts from the running code.
+
+- **Swagger UI:** `GET /docs` — browse and try every endpoint.
+- **Raw spec:** `GET /openapi.json` — feed to client/codegen tooling.
+
+Both are public (no Bearer token required). Each schema appears once under
+`components/schemas` named after its TypeScript type (e.g. `Event`, `IngestBatch`,
+`PolicyBundle`) and is referenced by `$ref`.
+
 ## Authentication
 
-Every request (except `GET /healthz`) must include:
+Every request (except `GET /healthz`, `GET /docs`, and `GET /openapi.json`) must include:
 
 ```
 Authorization: Bearer <AKA_LOCAL_TOKEN>
 ```
 
-Missing or incorrect tokens return:
+All errors share one envelope. Missing or incorrect tokens return:
 
 ```json
 HTTP 401
-{"error": "Unauthorized"}
+{ "error": { "code": "UNAUTHORIZED", "message": "Unauthorized" } }
 ```
+
+Request validation failures return `400` with `code: "VALIDATION_ERROR"` and a
+`details` array of the offending Zod issues.
 
 ---
 
