@@ -96,10 +96,19 @@ The hooks cannot do everything the warn/redact/block model might imply:
 Config lives in `~/.aka/config.json`, written by the `/aka:setup` command:
 
 ```json
-{ "backendUrl": "http://localhost:4000", "token": "mytoken1234567890" }
+{ "backendUrl": "http://localhost:4000", "token": "<your-api-key-or-local-token>" }
 ```
 
 Environment variables are **not** used: hooks are processes spawned by Claude Code, so a slash command cannot inject env into them — a file is the only reliable channel.
+
+The `token` field carries different values depending on the backend mode:
+
+| Backend mode                     | What `token` contains   | Header sent                     |
+| -------------------------------- | ----------------------- | ------------------------------- |
+| `local` / `test`                 | `AKA_LOCAL_TOKEN` value | `Authorization: Bearer <token>` |
+| `dev` / `hosted` / `self-hosted` | A Better Auth API key   | `x-api-key: <token>`            |
+
+To mint an API key for non-local modes, sign into the backend and use the API key creation endpoint. See [Minting an API key](../api/reference.md#minting-an-api-key) in the API reference.
 
 Unconfigured is a valid state: detection still runs with the bundled rule packs and default actions (`secret` → block, `pii` → redact where possible); only backend sync is disabled.
 
