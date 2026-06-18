@@ -46,10 +46,10 @@ The `MODE` variable selects which schema is validated and which features are ena
 ### Postgres mode
 
 | Variable             | Default | Description                                                                                                                                                                                            |
-| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `DATABASE_URL`       | —       | **Required.** PostgreSQL connection string. Must target the non-superuser runtime role `aka_app` (see [Postgres roles](#postgres-roles) below). Example: `postgresql://aka_app:akaapppw@host:5432/aka` |
-| `BETTER_AUTH_SECRET` | —       | \*\*Required for `MODE=dev                                                                                                                                                                             | hosted | self-hosted`.** Secret used by Better Auth to sign session tokens (min 32 chars). Generate with `openssl rand -hex 32`.            |
-| `BETTER_AUTH_URL`    | —       | \*\*Required for `MODE=dev                                                                                                                                                                             | hosted | self-hosted`.** Public base URL of the backend (e.g. `https://api.yourhost.com`). Used by Better Auth for redirect/cookie issuing. |
+| `BETTER_AUTH_SECRET` | —       | **Required for `MODE=dev`/`hosted`/`self-hosted`.** Secret used by Better Auth to sign session tokens (min 32 chars). Generate with `openssl rand -hex 32`.                                            |
+| `BETTER_AUTH_URL`    | —       | **Required for `MODE=dev`/`hosted`/`self-hosted`.** Public base URL of the backend (e.g. `https://api.yourhost.com`). Used by Better Auth for redirect/cookie issuing.                                 |
 
 ### Better Auth (authentication server)
 
