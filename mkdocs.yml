@@ -75,4 +75,5 @@ nav:
   - API Reference: api/reference.md
   - Deployment:
       - Local Mode: deployment/local.md
+      - Dev Mode: deployment/dev.md
       - Docker: deployment/docker.md
