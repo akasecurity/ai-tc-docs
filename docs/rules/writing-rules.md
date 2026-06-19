@@ -208,6 +208,32 @@ pnpm --filter @aka/detections test
 
 The fixture-driven test auto-discovers your new rule and runs all fixtures. Fix until green.
 
+## Testing a draft rule over the API
+
+Before a rule lives on disk you can preview it against the running engine with
+[`POST /v1/rules/test`](../api/reference.md#post-v1rulestest). Send your draft
+`rules` plus some `text` and/or `fixtures`; the response reports each match (with
+the raw matched substring) and, for fixtures, whether the engine's behaviour met
+the `shouldMatch` expectation. Nothing is persisted — it is a pure dry-run, ideal
+for an authoring UI or a quick `curl` while tuning a regex.
+
+```bash
+curl -X POST http://localhost:4000/v1/rules/test \
+  -H "Authorization: Bearer $AKA_LOCAL_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rules": [{
+      "specVersion": 1, "id": "payments/stripe-secret-key", "name": "Stripe Secret Key",
+      "category": "secret", "severity": "critical",
+      "matcher": { "type": "regex", "pattern": "\\bsk_live_[A-Za-z0-9]{24}\\b", "flags": "g" }
+    }],
+    "fixtures": [
+      { "label": "live key", "text": "STRIPE_KEY=sk_live_aBcDeFgHiJkLmNoPqRsTuVwXy", "shouldMatch": true },
+      { "label": "test key", "text": "sk_test_aBcDeFgHiJkLmNoPqRsTuVwXy", "shouldMatch": false }
+    ]
+  }'
+```
+
 ## Severity guidelines
 
 | Severity   | When to use                                                                   |
