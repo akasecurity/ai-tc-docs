@@ -295,11 +295,11 @@ The request body must contain `rules` plus at least one of `text` or a non-empty
 
 **Body fields:**
 
-| Field      | Type        | Required | Description                                                |
-| ---------- | ----------- | -------- | ---------------------------------------------------------- |
-| `rules`    | `Rule[]`    | Yes      | Draft rules to evaluate (1–100), same shape as a pack rule |
-| `text`     | string      | No\*     | Ad-hoc text to scan; returns matches with no pass/fail     |
-| `fixtures` | `Fixture[]` | No\*     | Test cases (`{ label, text, shouldMatch }`), 0–200         |
+| Field      | Type            | Required | Description                                                |
+| ---------- | --------------- | -------- | ---------------------------------------------------------- |
+| `rules`    | `Rule[]`        | Yes      | Draft rules to evaluate (1–100), same shape as a pack rule |
+| `text`     | string          | No\*     | Ad-hoc text to scan; returns matches with no pass/fail     |
+| `fixtures` | `RuleFixture[]` | No\*     | Test cases (`{ label, text, shouldMatch }`), 0–200         |
 
 \* At least one of `text` / `fixtures` must be present.
 
@@ -314,7 +314,7 @@ The request body must contain `rules` plus at least one of `text` or a non-empty
         "category": "pii",
         "severity": "low",
         "span": { "start": 11, "end": 27 },
-        "confidence": 1,
+        "confidence": 0.9,
         "match": "jane@example.com"
       }
     ]
