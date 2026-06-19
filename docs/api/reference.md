@@ -258,6 +258,108 @@ curl -X POST http://localhost:4000/v1/policies \
 
 ---
 
+## POST /v1/rules/test
+
+Runs **draft** detection rules through the engine against ad-hoc text and/or
+fixtures, without publishing or installing anything. Use it to preview and tune a
+matcher while authoring a rule. The response is stateless — nothing is persisted.
+
+The request body must contain `rules` plus at least one of `text` or a non-empty
+`fixtures` array (otherwise there is nothing to test → `400`).
+
+**Request body:**
+
+```json
+{
+  "rules": [
+    {
+      "specVersion": 1,
+      "id": "draft/email",
+      "name": "Email address",
+      "category": "pii",
+      "severity": "low",
+      "matcher": {
+        "type": "regex",
+        "pattern": "[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}",
+        "flags": "gi"
+      }
+    }
+  ],
+  "text": "mail me at jane@example.com",
+  "fixtures": [
+    { "label": "has email", "text": "a@b.com", "shouldMatch": true },
+    { "label": "no email", "text": "just words", "shouldMatch": false }
+  ]
+}
+```
+
+**Body fields:**
+
+| Field      | Type        | Required | Description                                                |
+| ---------- | ----------- | -------- | ---------------------------------------------------------- |
+| `rules`    | `Rule[]`    | Yes      | Draft rules to evaluate (1–100), same shape as a pack rule |
+| `text`     | string      | No\*     | Ad-hoc text to scan; returns matches with no pass/fail     |
+| `fixtures` | `Fixture[]` | No\*     | Test cases (`{ label, text, shouldMatch }`), 0–200         |
+
+\* At least one of `text` / `fixtures` must be present.
+
+**Response `200 OK`:**
+
+```json
+{
+  "adhoc": {
+    "matches": [
+      {
+        "ruleId": "draft/email",
+        "category": "pii",
+        "severity": "low",
+        "span": { "start": 11, "end": 27 },
+        "confidence": 1,
+        "match": "jane@example.com"
+      }
+    ]
+  },
+  "fixtures": [
+    {
+      "label": "has email",
+      "shouldMatch": true,
+      "didMatch": true,
+      "passed": true,
+      "matches": [
+        /* ... */
+      ]
+    },
+    { "label": "no email", "shouldMatch": false, "didMatch": false, "passed": true, "matches": [] }
+  ],
+  "summary": { "total": 2, "passed": 2, "failed": 0 },
+  "unsupportedRuleIds": []
+}
+```
+
+- `adhoc` is present only when `text` was supplied.
+- `match` is the **raw** matched substring (unlike findings, which mask) — the
+  input is your own test text, so this is what lets you tune the matcher.
+- `unsupportedRuleIds` lists rules whose matcher type the engine cannot evaluate
+  yet (e.g. `validator`); they silently never match, so they are flagged here.
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:4000/v1/rules/test \
+  -H "Authorization: Bearer mytoken1234567890" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rules": [{
+      "specVersion": 1, "id": "draft/email", "name": "Email",
+      "category": "pii", "severity": "low",
+      "matcher": { "type": "regex", "pattern": "[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}" }
+    }],
+    "text": "mail me at jane@example.com"
+  }'
+```
+
+---
+
 ## Error responses
 
 All error responses follow the same shape:
