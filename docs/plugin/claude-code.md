@@ -133,6 +133,24 @@ Unconfigured is a valid state: until `/aka:setup` runs, detection still uses the
 
 > **Enterprise (Phase 2).** A backend URL + bearer token live in a separate `~/.aka/settings/config.json` and gate remote sync. The local-first flow above does not ask for either — they are not part of `/aka:setup` today.
 
+## Plugin + local backend (optional)
+
+Choosing `local-backend` at setup unlocks the full experience: web dashboards and a policy engine over the **same** `~/.aka/data/aka.db` the plugin already writes. Bring it up with the dedicated compose file:
+
+```bash
+# host needs this repo cloned; reads ~/.aka/data/aka.db
+AKA_LOCAL_TOKEN=$(openssl rand -hex 16) \
+  docker compose -f docker/docker-compose.local.yml up
+# dashboard → http://localhost:5173   ·   backend/API → http://localhost:7878
+```
+
+Two properties keep the shared file safe:
+
+- **Migrations are off** (`MIGRATE_ON_START=false`) — the plugin owns the schema and self-migrates on open, so there is no dual-migrator race. The writers are disjoint: the plugin writes `events`/`findings`, the backend writes `policies`, and WAL lets both share the file.
+- **The backend adopts the plugin's identity** — in `local` mode it resolves its tenant from the single existing `tenants` row (the UUID the plugin seeded) instead of a hardcoded stub, so dashboards render over the populated DB rather than an empty stub tenant.
+
+Run the plugin at least once before starting the stack so `~/.aka/data` exists and is owned by you. Toggling a policy in the dashboard is picked up by the plugin's next run via the shared `policies` table.
+
 ## Installing, developing, and testing
 
 Loading the plugin needs the Claude Code **CLI** (the `claude` command). Install it with the native installer (a standalone binary, independent of your Node setup) or npm:
