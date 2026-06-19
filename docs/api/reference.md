@@ -216,6 +216,48 @@ curl http://localhost:4000/v1/policy-bundle \
 
 ---
 
+## POST /v1/policies
+
+Creates a policy for the authenticated tenant. The body is a `CreatePolicyRequest`
+(a `Policy` without `id`/`tenantId` — both are server-assigned). At most one policy
+may exist per `(scope, target)` within a tenant.
+
+**Request body:**
+
+```json
+{
+  "scope": "repo",
+  "target": { "category": "secret" },
+  "action": "block",
+  "enabled": true
+}
+```
+
+**Response `200 OK`** — the created policy, including its generated `id` and `tenantId`.
+
+**Response `409 Conflict`** — a policy with the same `(scope, target)` already exists
+for this tenant:
+
+```json
+{
+  "error": {
+    "code": "CONFLICT",
+    "message": "A policy with the same (scope, target) already exists for this tenant"
+  }
+}
+```
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:4000/v1/policies \
+  -H "Authorization: Bearer mytoken1234567890" \
+  -H "Content-Type: application/json" \
+  -d '{"scope":"repo","target":{"category":"secret"},"action":"block","enabled":true}'
+```
+
+---
+
 ## Error responses
 
 All error responses follow the same shape:
