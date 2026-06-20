@@ -596,6 +596,42 @@ curl "http://localhost:4000/v1/security/top-sources?range=30d&limit=5" \
 
 ---
 
+## GET /v1/security/scan-coverage
+
+Per-provider scan coverage for the **Security** dashboard "Scan coverage" card.
+In the initial release only Claude Code is scanned; other providers return
+`supported: false` (the FE greys them out / shows "Soon").
+
+**Query parameters:** `range` (see above) — accepted and echoed, but coverage is
+currently a constant business fact, not a per-window metric.
+
+**Response `200 OK`:**
+
+```json
+{
+  "range": "30d",
+  "providers": [
+    { "provider": "claudecode", "coverage": 100, "supported": true },
+    { "provider": "cursor", "coverage": 0, "supported": false },
+    { "provider": "chatgpt", "coverage": 0, "supported": false },
+    { "provider": "copilot", "coverage": 0, "supported": false },
+    { "provider": "api", "coverage": 0, "supported": false }
+  ]
+}
+```
+
+`provider` is a stable id (note `claudecode`, distinct from the event
+`sourceTool` `claude-code`). `coverage` is `0` whenever `supported` is `false`.
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/security/scan-coverage?range=30d" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
 ## Error responses
 
 All error responses follow the same shape:
