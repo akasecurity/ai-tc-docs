@@ -436,6 +436,39 @@ curl -X POST http://localhost:4000/v1/rules/test \
 
 ---
 
+## GET /v1/security/findings/severity-summary
+
+Findings grouped by severity, for the **Security** dashboard "Open by severity"
+donut. Not range-scoped — reflects findings for the tenant at request time.
+**Note:** findings have no resolution state yet, so this counts _all_ findings
+(the "open" framing arrives when a finding lifecycle exists). All four severity
+levels are always present (count may be 0).
+
+**Query parameters:** none.
+
+**Response `200 OK`:**
+
+```json
+{
+  "total": 131,
+  "bySeverity": [
+    { "severity": "critical", "count": 9 },
+    { "severity": "high", "count": 23 },
+    { "severity": "medium", "count": 41 },
+    { "severity": "low", "count": 58 }
+  ]
+}
+```
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/security/findings/severity-summary" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
 ## Error responses
 
 All error responses follow the same shape:
