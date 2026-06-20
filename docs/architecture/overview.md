@@ -14,7 +14,7 @@ ai-control-plane/
 │   ├── schema/           Zod contracts — single source of truth
 │   ├── config/           Env loader — sole reader of process.env
 │   ├── detections/       Pure detection engine (no I/O)
-│   ├── client/           Typed fetch client (sole caller of fetch)
+│   ├── client/           Generated API client (sole caller of fetch)
 │   ├── plugin-sdk/       AkaPluginAdapter interface + runtime
 │   └── ui-kit/           Shared React component library (stub)
 ├── rules/
@@ -102,6 +102,31 @@ The plugin stores this in memory and uses it to resolve actions without a round-
 ### Dashboard
 
 The dashboard is a React SPA that calls the backend's REST API via TanStack Query. It builds to `apps/backend/public/` so the production container serves both the API and the UI from a single port.
+
+## API client generation
+
+`@aka/client` is **generated**, not hand-maintained. The contract flows one way:
+
+```
+@aka/schema (Zod)  →  Fastify OpenAPI spec  →  @aka/client (Hey API)
+  single source        GET /openapi.json         typed SDK + TanStack Query
+   of truth          (backend + registry)        options, sole fetch caller
+```
+
+`packages/client/gen/dump-specs.ts` boots each Fastify app to `ready()` against an
+in-memory SQLite DB and writes `app.swagger()` to `packages/client/openapi/*.json`
+(no server, no real DB). [Hey API](https://heyapi.dev) (`@hey-api/openapi-ts`) then
+generates `packages/client/src/generated/**` — **types only**, no runtime
+validation, since the server already validates and the types derive from the same
+Zod contracts. A thin hand-written wrapper (`src/index.ts`) keeps the stable public
+surface (`createClient` / `createRegistryClient` / `RegistryRequestError`, typed
+with `@aka/schema`) and owns what codegen can't: the dual `x-api-key` + `Bearer`
+auth headers and per-instance `baseUrl`/`token`.
+
+Specs and generated output are committed; `pnpm --filter @aka/client gen:openapi:check`
+regenerates and fails on drift (run in CI). Generated files are `@ts-nocheck`,
+ESLint-ignored, and Prettier-ignored — type-safety is enforced at the wrapper
+boundary and each call site.
 
 ## Request lifecycle (backend)
 
