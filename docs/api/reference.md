@@ -469,6 +469,95 @@ curl "http://localhost:4000/v1/security/findings/severity-summary" \
 
 ---
 
+## Shared `range` query parameter
+
+The range-driven Security widgets accept a `range` query parameter:
+
+| Parameter | Type | Default | Allowed              |
+| --------- | ---- | ------- | -------------------- |
+| `range`   | enum | `30d`   | `7d` `30d` `3m` `6m` |
+
+An unsupported value fails validation → `400` with `code: "VALIDATION_ERROR"`.
+
+---
+
+## GET /v1/security/enforcement-actions
+
+Intercepted actions in the window for the **Security** dashboard "Enforcement
+actions" card — total plus per-kind counts (`blocked`/`redacted`/`warned`) with
+the period-over-period delta vs the immediately preceding window of equal length.
+
+**Query parameters:** `range` (see above).
+
+**Response `200 OK`:**
+
+```json
+{
+  "range": "30d",
+  "total": 1817,
+  "actions": [
+    { "kind": "blocked", "count": 96, "delta": 12 },
+    { "kind": "redacted", "count": 1284, "delta": 148 },
+    { "kind": "warned", "count": 437, "delta": -9 }
+  ]
+}
+```
+
+All three kinds are always present (count may be 0). `delta` is signed. Findings
+with `actionTaken` of `allow`/`log` are not enforcement and are excluded.
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/security/enforcement-actions?range=30d" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
+## GET /v1/security/findings/timeseries
+
+New detections per time bucket, split by severity, for the **Security** dashboard
+"Findings over time" chart. Granularity is server-chosen from the range
+(`7d`/`30d` → `day`; `3m`/`6m` → `week`). Buckets with no findings are present
+with zeros, ordered oldest → newest.
+
+**Query parameters:** `range` (see above).
+
+**Response `200 OK`:**
+
+```json
+{
+  "range": "30d",
+  "granularity": "day",
+  "points": [
+    { "timestamp": "2026-05-21", "critical": 7, "high": 19, "medium": 22 },
+    { "timestamp": "2026-05-22", "critical": 5, "high": 17, "medium": 25 }
+  ]
+}
+```
+
+The chart plots `critical`/`high`/`medium`; `low` is intentionally omitted.
+
+Buckets are **rolling**, not calendar-aligned: for `week` granularity they tile
+forward in 7-day steps from the window start (the day `range` days ago), so a
+`timestamp` is not necessarily a Monday.
+
+> **Note — this total will not equal `enforcement-actions` `total`.** The two
+> widgets use different windows on purpose: `enforcement-actions` is a rolling
+> `[now − range, now)`, while the timeseries is day-aligned to UTC midnight and
+> excludes `low` (and counts detections, not enforcement actions). Summing the
+> timeseries buckets is expected to differ from the enforcement total.
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/security/findings/timeseries?range=30d" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
 ## Error responses
 
 All error responses follow the same shape:
