@@ -119,11 +119,11 @@ node apps/plugin-claude-code/scripts/query.js findings
 `/aka:setup` is a two-step onboarding wizard that records local preferences to `~/.aka/settings/settings.json` (created `0600`, owner-only) via `scripts/onboard.js`:
 
 ```json
-{ "specVersion": 1, "mode": "plugin-only", "redaction": "redact", "onboardedAt": "2026-06-18T..." }
+{ "specVersion": 1, "runMode": "standalone", "policy": "redact", "onboardedAt": "2026-06-18T..." }
 ```
 
-- **`mode`** — `plugin-only` (default, no Docker) or `local-backend` (opt-in Docker for web dashboards + a policy engine over the same DB).
-- **`redaction`** — `redact` (replace sensitive values in place where the host allows) or `warn` (surface a warning, never modify content).
+- **`runMode`** — `standalone` (default, no Docker) or `attached` (opt-in Docker for web dashboards + a policy engine over the same DB).
+- **`policy`** — `redact` (replace sensitive values in place where the host allows) or `warn` (surface a warning, never modify content).
 
 The settings file is **versioned** (`specVersion`): a future onboarding step is one more optional field, and an older `settings.json` still parses with the missing key taking its default.
 
@@ -135,7 +135,7 @@ Unconfigured is a valid state: until `/aka:setup` runs, detection still uses the
 
 ## Plugin + local backend (optional)
 
-Choosing `local-backend` at setup unlocks the full experience: web dashboards and a policy engine over the **same** `~/.aka/data/aka.db` the plugin already writes. Bring it up with the dedicated compose file:
+Choosing `attached` at setup unlocks the full experience: web dashboards and a policy engine over the **same** `~/.aka/data/aka.db` the plugin already writes. Bring it up with the dedicated compose file:
 
 ```bash
 # host needs this repo cloned; reads ~/.aka/data/aka.db
