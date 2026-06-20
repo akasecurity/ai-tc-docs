@@ -632,6 +632,90 @@ curl "http://localhost:4000/v1/security/scan-coverage?range=30d" \
 
 ---
 
+## GET /v1/security/recommended-actions
+
+Prioritized, environment-specific suggestions for the **Security** dashboard
+"Recommended actions" list. Excludes dismissed/applied (only `open` are returned).
+
+> **Status:** the recommendation **engine** that generates these rows, and the
+> executor that performs the underlying change on apply, are not built yet. Rows
+> are created via the dev seed; `apply` transitions status and echoes the action
+> but does not yet perform the concrete mutation.
+
+**Query parameters:**
+
+| Parameter | Type    | Default | Notes     |
+| --------- | ------- | ------- | --------- |
+| `limit`   | integer | `3`     | `1`–`20`. |
+
+**Response `200 OK`:**
+
+```json
+{
+  "items": [
+    {
+      "id": "rec_01HZX",
+      "category": "block_credentials",
+      "severity": "critical",
+      "title": "Block AWS keys in payments-api",
+      "description": "5 access keys reached Claude Code prompts this week. Promote the policy from warn to block for this repo.",
+      "subjects": [
+        { "type": "repo", "id": "payments-api", "label": "payments-api" },
+        { "type": "policy", "id": "pol_8821", "label": "Block cloud credentials" }
+      ],
+      "action": {
+        "mode": "apply",
+        "type": "promote_policy_to_block",
+        "label": "Promote to block",
+        "policyId": "pol_8821"
+      }
+    }
+  ]
+}
+```
+
+`action.mode` is `apply` (mutation via the apply endpoint) or `navigate` (the FE
+deep-links `action.href`, no server call). `category` and `action.type` are
+extensible.
+
+---
+
+## POST /v1/security/recommended-actions/{id}/apply
+
+Approve a recommendation: resolves it (drops it off the list) and echoes the
+action that was applied. Only valid when `action.mode === "apply"`.
+
+- **Path params:** `id` — the recommendation id.
+- **Body:** none.
+
+**Response `200 OK`:**
+
+```json
+{
+  "id": "rec_01HZX",
+  "status": "applied",
+  "appliedAction": { "type": "promote_policy_to_block", "policyId": "pol_8821" }
+}
+```
+
+**Errors:**
+
+| Status | `code`                     | When                                               |
+| ------ | -------------------------- | -------------------------------------------------- |
+| `404`  | `recommendation_not_found` | Unknown id, or not visible to the caller's tenant. |
+| `409`  | `already_resolved`         | Already applied or dismissed.                      |
+| `422`  | `not_applicable`           | `action.mode` is `navigate` (nothing to apply).    |
+
+## POST /v1/security/recommended-actions/{id}/dismiss
+
+Dismiss a recommendation (drops it off the list).
+
+- **Path params:** `id`. **Body:** none.
+- **Response `200 OK`:** `{ "id": "rec_01HZX", "status": "dismissed" }`
+- **Errors:** `404 recommendation_not_found`; `409 already_resolved`.
+
+---
+
 ## Error responses
 
 All error responses follow the same shape:
