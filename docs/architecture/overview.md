@@ -28,8 +28,9 @@ ai-control-plane/
 │   └── write-detection-rule/SKILL.md
 └── docker/
     ├── Dockerfile
-    ├── docker-compose.yml        (prod)
-    └── docker-compose.dev.yml    (dev)
+    ├── docker-compose.yml        (prod / self-hosted)
+    ├── docker-compose.dev.yml    (dev)
+    └── docker-compose.local.yml  (plugin + local backend over ~/.aka/data)
 ```
 
 ## Package dependency rules
@@ -53,9 +54,45 @@ Three cross-cutting rules every contributor must remember:
 2. **No `fetch()` outside `packages/client`** — by convention + boundary lint
 3. **No Drizzle imports outside `apps/backend/src/repositories/` and `tools/migrator/`**
 
+## Local-first plugin & optional backend (Phase 1)
+
+The plugin is fully useful with **zero backend and zero Docker**. It owns a local
+SQLite store at `~/.aka/data/aka.db` and is the always-present writer of `events`
+and `findings`; detection runs in-process and results surface through slash
+commands (`/aka:health`, `/aka:findings`, `/aka:recommend`, `/aka:audit`). This
+on-disk layout and the data layer live in `@aka/plugin-sdk` and are shared by
+every plugin (Claude Code first, VSCode/Cursor later) — a new plugin adds only a
+thin tool-specific adapter, never a copy of the storage/detection logic.
+
+```
+ Claude Code ──hooks──▶ AKA plugin (adapter) ──▶ @aka/plugin-sdk
+                                                      │ writes
+                                                      ▼
+        ~/.aka/data/aka.db   (events · findings · policies)   ◀── shared by all plugins
+                ▲                                   ▲
+   (optional) local backend (Docker)        (Phase 2) enterprise sync
+   dashboards + policy engine, SAME DB        tenant-less wire → Org API
+```
+
+A user may **opt in** to "Plugin + local backend" (`docker/docker-compose.local.yml`):
+the backend and dashboard read/serve that **same** `aka.db`. Two seams make the
+shared file safe:
+
+- **Migration ownership.** The plugin owns the schema and self-migrates on open,
+  so the backend runs `MIGRATE_ON_START=false` — no dual-migrator race. The
+  writers are disjoint (plugin → `events`/`findings`, backend → `policies`) and
+  WAL lets both share the file.
+- **Identity.** The plugin seeds one tenant/user with a **generated UUID** on
+  first run. In `local` mode the backend resolves its tenant from that existing
+  row (not a hardcoded stub), so its dashboards aren't empty over a
+  plugin-populated DB. Phase-2 org-connect rebinds the identity to org-issued ids.
+
+Enterprise auth and remote sync are **Phase 2**; in Phase 1 nothing leaves the
+machine.
+
 ## Data flow
 
-### Event ingestion (plugin → backend → DB)
+### Event ingestion (plugin → local store; → backend is Phase 2)
 
 ```
 ┌────────────────────────────────────────────┐

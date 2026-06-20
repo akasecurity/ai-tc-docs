@@ -74,14 +74,19 @@ AKA uses two distinct Postgres roles to keep schema ownership separate from runt
 
 **Hosted deployments**: `aka_app`'s password (`akaapppw`) is for local dev and CI only. In production, inject the credentials via your managed secret provider and set `DATABASE_URL` accordingly — never commit production credentials.
 
-### Plugin variables
+### Plugin configuration (local-first)
 
-These are read by `apps/plugin-claude-code` (not the backend). Set them in the shell where Claude Code runs.
+The Claude Code plugin is **not** configured through environment variables — hooks
+are bare processes Claude Code spawns, so env can't reach them. It owns a local
+store and settings under `~/.aka` instead:
 
-| Variable          | Description                                                                                                                                                       |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AKA_BACKEND_URL` | Backend base URL. Default: `http://localhost:4000`                                                                                                                |
-| `AKA_LOCAL_TOKEN` | **Local mode only.** Must match the backend's `AKA_LOCAL_TOKEN`. In non-local modes, the plugin uses a Better Auth API key instead (configured via `/aka:setup`). |
+- `~/.aka/data/aka.db` — the SQLite store the plugin writes (events + findings).
+- `~/.aka/settings/settings.json` — onboarding answers (`mode`, `redaction`),
+  written by `/aka:setup`. See [Claude Code plugin → Configuration](../plugin/claude-code.md#configuration).
+
+The plugin works with **zero backend**. The optional local backend (below) reads
+that same `aka.db`; an enterprise backend URL + token (Phase 2) live in
+`~/.aka/settings/config.json`, not in the environment.
 
 ## Example configurations
 
@@ -95,6 +100,23 @@ These are read by `apps/plugin-claude-code` (not the backend). Set them in the s
     MIGRATE_ON_START=true
     PORT=4000
     LOG_LEVEL=info
+    ```
+
+=== "Plugin + local backend (shared DB)"
+
+    The opt-in "full experience": a backend over the plugin's own
+    `~/.aka/data/aka.db`. Migrations are **off** — the plugin owns the schema —
+    and the backend resolves its tenant from the row the plugin already seeded,
+    so its dashboards aren't empty over a populated DB. Brought up by
+    `docker/docker-compose.local.yml`.
+
+    ```bash
+    MODE=local
+    STORAGE_DRIVER=sqlite
+    SQLITE_PATH=/data/aka.db        # ~/.aka/data mounted at /data
+    MIGRATE_ON_START=false          # plugin owns migrations
+    AKA_LOCAL_TOKEN=mytoken1234567890
+    PORT=7878
     ```
 
 === "Docker dev (Postgres)"
