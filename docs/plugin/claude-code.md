@@ -122,7 +122,7 @@ node apps/plugin-claude-code/scripts/query.js findings
 { "specVersion": 1, "runMode": "standalone", "policy": "redact", "onboardedAt": "2026-06-18T..." }
 ```
 
-- **`runMode`** — `standalone` (default, no Docker) or `attached` (opt-in Docker for web dashboards + a policy engine over the same DB).
+- **`runMode`** — `standalone` (default, no Docker) or `attached` (wired to a local backend). The runtime resolves its data path from this value via the **`DataGateway`** port (`@aka/plugin-runtime`): standalone reads/writes the local SQLite store at `~/.aka/data/aka.db` (`@aka/persistence`); attached goes through the backend's HTTP API (`@aka/client`) and pulls the org's centrally-managed ruleset into a local cache that drives in-process detection.
 - **`policy`** — `redact` (replace sensitive values in place where the host allows) or `warn` (surface a warning, never modify content).
 
 The settings file is **versioned** (`specVersion`): a future onboarding step is one more optional field, and an older `settings.json` still parses with the missing key taking its default.
@@ -133,9 +133,13 @@ Unconfigured is a valid state: until `/aka:setup` runs, detection still uses the
 
 > **Enterprise (Phase 2).** A backend URL + bearer token live in a separate `~/.aka/settings/config.json` and gate remote sync. The local-first flow above does not ask for either — they are not part of `/aka:setup` today. The `token` carries an `AKA_LOCAL_TOKEN` (sent as `Authorization: Bearer`) in `local`/`test` modes, or a Better Auth API key (sent as `x-api-key`) in `dev`/`hosted`/`self-hosted` modes; see [Minting an API key](../api/reference.md#minting-an-api-key) in the API reference.
 
-## Plugin + local backend (optional)
+## Plugin + local backend over the shared file (optional)
 
-Choosing `attached` at setup unlocks the full experience: web dashboards and a policy engine over the **same** `~/.aka/data/aka.db` the plugin already writes. Bring it up with the dedicated compose file:
+A local backend can read and serve the **same** `~/.aka/data/aka.db` that the
+**standalone** plugin writes — web dashboards plus a policy engine over your
+local data, with nothing leaving the machine. This file-sharing setup runs
+alongside `runMode: standalone`: the plugin keeps reading/writing the SQLite file
+directly, and the backend reads it. Bring it up with the dedicated compose file:
 
 ```bash
 # host needs this repo cloned; reads ~/.aka/data/aka.db
@@ -149,7 +153,14 @@ Two properties keep the shared file safe:
 - **Migrations are off** (`MIGRATE_ON_START=false`) — the plugin owns the schema and self-migrates on open, so there is no dual-migrator race. The writers are disjoint: the plugin writes `events`/`findings`, the backend writes `policies`, and WAL lets both share the file.
 - **The backend adopts the plugin's identity** — in `local` mode it resolves its tenant from the single existing `tenants` row (the UUID the plugin seeded) instead of a hardcoded stub, so dashboards render over the populated DB rather than an empty stub tenant.
 
-Run the plugin at least once before starting the stack so `~/.aka/data` exists and is owned by you. Toggling a policy in the dashboard is picked up by the plugin's next run via the shared `policies` table.
+Run the plugin at least once before starting the stack so `~/.aka/data` exists and is owned by you. Toggling a policy in the dashboard is picked up by the standalone plugin's next run via the shared `policies` table.
+
+> **`attached` is a different topology.** Setting `runMode: attached` points the
+> plugin at a backend over its **HTTP API** (events via ingest, reads + the
+> policy bundle via the API) rather than the shared file — for when the backend,
+> not the local file, is the source of truth. The file-sharing setup above keeps
+> the plugin in `standalone`. Reconciling the two (which compose topology backs
+> `attached`) is tracked separately.
 
 ## Installing, developing, and testing
 
