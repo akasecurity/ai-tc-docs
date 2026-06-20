@@ -15,6 +15,27 @@ Both are public (no auth required). Each schema appears once under
 `components/schemas` named after its TypeScript type (e.g. `Event`, `IngestBatch`,
 `PolicyBundle`) and is referenced by `$ref`.
 
+The **rule registry** (`apps/registry`) generates its spec the same way and serves
+its own **`GET /docs`** and **`GET /openapi.json`**. Browse/read endpoints are
+public; only `publishPackVersion` / `forkPack` require a bearer token (marked with
+`bearerAuth` in the spec).
+
+### Generated client
+
+`@aka/client` is **generated** from these two specs with
+[Hey API](https://heyapi.dev) (`@hey-api/openapi-ts`) — not hand-written. The
+pipeline is Zod (`@aka/schema`) → Fastify OpenAPI spec → typed client, so the
+client cannot drift from the server. To regenerate after changing a route or
+schema:
+
+```bash
+pnpm --filter @aka/client gen:openapi          # dump both specs + regenerate
+pnpm --filter @aka/client gen:openapi:check     # CI: regenerate and fail on drift
+```
+
+The dumped specs (`packages/client/openapi/*.json`) and the generated output
+(`packages/client/src/generated/**`) are committed; CI runs the drift check.
+
 ## Authentication
 
 AKA supports two auth schemes depending on `MODE`:
