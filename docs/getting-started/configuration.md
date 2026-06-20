@@ -36,19 +36,26 @@ The `MODE` variable selects which schema is validated and which features are ena
 | `MIGRATE_ON_START` | `false`      | Run pending migrations before accepting traffic                       |
 | `VERSION`          | `0.0.0`      | Injected by CI into the Docker image; appears in `/healthz`           |
 
-### SQLite mode
+### SQLite mode (local/test only)
 
-| Variable          | Default    | Description                                                                        |
-| ----------------- | ---------- | ---------------------------------------------------------------------------------- |
-| `SQLITE_PATH`     | `./aka.db` | Filesystem path to the SQLite database file. Use `:memory:` for tests.             |
-| `AKA_LOCAL_TOKEN` | —          | **Required.** Bearer token (min 16 chars) used as the auth token in local/dev mode |
+| Variable          | Default    | Description                                                                                                                                                                                        |
+| ----------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SQLITE_PATH`     | `./aka.db` | Filesystem path to the SQLite database file. Use `:memory:` for tests.                                                                                                                             |
+| `AKA_LOCAL_TOKEN` | —          | **Required for `MODE=local` and `MODE=test`.** Bearer token (min 16 chars) used as the auth token. Not used or accepted for `dev`/`hosted`/`self-hosted` modes — use Better Auth API keys instead. |
 
 ### Postgres mode
 
-| Variable          | Default | Description                                                                                                                                                                                            |
-| ----------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DATABASE_URL`    | —       | **Required.** PostgreSQL connection string. Must target the non-superuser runtime role `aka_app` (see [Postgres roles](#postgres-roles) below). Example: `postgresql://aka_app:akaapppw@host:5432/aka` |
-| `AKA_LOCAL_TOKEN` | —       | **Required (dev mode).** Bearer token for dev-mode auth stub                                                                                                                                           |
+| Variable             | Default | Description                                                                                                                                                                                            |
+| -------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`       | —       | **Required.** PostgreSQL connection string. Must target the non-superuser runtime role `aka_app` (see [Postgres roles](#postgres-roles) below). Example: `postgresql://aka_app:akaapppw@host:5432/aka` |
+| `BETTER_AUTH_SECRET` | —       | **Required for `MODE=dev`/`hosted`/`self-hosted`.** Secret used by Better Auth to sign session tokens (min 32 chars). Generate with `openssl rand -hex 32`.                                            |
+| `BETTER_AUTH_URL`    | —       | **Required for `MODE=dev`/`hosted`/`self-hosted`.** Public base URL of the backend (e.g. `https://api.yourhost.com`). Used by Better Auth for redirect/cookie issuing.                                 |
+
+### Better Auth (authentication server)
+
+AKA uses [Better Auth](https://better-auth.com) for identity in non-local modes. Users sign up with email + password; machine clients (the Claude Code plugin) authenticate with an API key sent in the `x-api-key` header.
+
+`AKA_LOCAL_TOKEN` must **not** be set for `MODE=dev|hosted|self-hosted`. Setting it will cause a startup validation failure. It is only valid for `local`/`test` modes where Better Auth is not used.
 
 ### Postgres roles
 
@@ -120,7 +127,9 @@ that same `aka.db`; an enterprise backend URL + token (Phase 2) live in
     # Connect as the non-superuser runtime role so FORCE RLS is active.
     # The owner role (aka) is used only for migrations, never for runtime queries.
     DATABASE_URL=postgresql://aka_app:akaapppw@postgres:5432/aka
-    AKA_LOCAL_TOKEN=devtoken123456789
+    # Better Auth required for non-local modes — generate a secret with: openssl rand -hex 32
+    BETTER_AUTH_SECRET=<generate-with-openssl-rand-hex-32>
+    BETTER_AUTH_URL=http://localhost:4000
     PORT=4000
     MIGRATE_ON_START=true
     LOG_LEVEL=debug
@@ -132,21 +141,24 @@ that same `aka.db`; an enterprise backend URL + token (Phase 2) live in
     MODE=self-hosted
     STORAGE_DRIVER=postgres
     DATABASE_URL=postgresql://user:secret@db.internal:5432/aka
-    AKA_LOCAL_TOKEN=<generate-with-openssl-rand-hex-32>
+    BETTER_AUTH_SECRET=<generate-with-openssl-rand-hex-32>
+    BETTER_AUTH_URL=https://api.yourhost.com
     PORT=4000
     MIGRATE_ON_START=true
     LOG_LEVEL=warn
     VERSION=1.2.3
     ```
 
-## Generating a secure token
+## Generating a secure secret
 
 ```bash
 openssl rand -hex 32
 # → a3f8c2e7d1b9456f0e2a8c4d6b3e7f1a2c5d8e9b0f3a6c9d2e5f8b1c4d7e0f3
 ```
 
-Use the output as `AKA_LOCAL_TOKEN`. It must be the same value set in both the backend and the Claude Code plugin environment.
+Use the output as `BETTER_AUTH_SECRET` (non-local modes) or `AKA_LOCAL_TOKEN` (local/test modes).
+
+For local mode, `AKA_LOCAL_TOKEN` must be the same value set in both the backend and the Claude Code plugin environment.
 
 ## Validation errors
 

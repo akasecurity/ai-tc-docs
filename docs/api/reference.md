@@ -1,6 +1,6 @@
 # API Reference
 
-All API routes are served by `apps/backend` on port 4000 (default). The current auth scheme is a Bearer token that must match `AKA_LOCAL_TOKEN`.
+All API routes are served by `apps/backend` on port 4000 (default).
 
 ## Interactive docs (OpenAPI)
 
@@ -11,19 +11,74 @@ so the spec never drifts from the running code.
 - **Swagger UI:** `GET /docs` — browse and try every endpoint.
 - **Raw spec:** `GET /openapi.json` — feed to client/codegen tooling.
 
-Both are public (no Bearer token required). Each schema appears once under
+Both are public (no auth required). Each schema appears once under
 `components/schemas` named after its TypeScript type (e.g. `Event`, `IngestBatch`,
 `PolicyBundle`) and is referenced by `$ref`.
 
 ## Authentication
 
-Every request (except `GET /healthz`, `GET /docs`, and `GET /openapi.json`) must include:
+AKA supports two auth schemes depending on `MODE`:
+
+### Local / test mode (`MODE=local|test`)
+
+Uses a shared Bearer token that must match `AKA_LOCAL_TOKEN`:
 
 ```
 Authorization: Bearer <AKA_LOCAL_TOKEN>
 ```
 
-All errors share one envelope. Missing or incorrect tokens return:
+### Non-local modes (`MODE=dev|hosted|self-hosted`)
+
+Two schemes are supported, checked in this order on each request:
+
+**1. API key (machine clients — Claude Code plugin)**
+
+Send the API key in the `x-api-key` header:
+
+```
+x-api-key: <your-api-key>
+```
+
+The key is hashed before storage — it is shown **once** at creation. A user must have a valid session to mint a key. See [Minting an API key](#minting-an-api-key) below.
+
+**2. Session cookie (browser / interactive)**
+
+After signing in via `POST /api/auth/sign-in/email`, Better Auth sets a session cookie that is sent automatically with subsequent requests.
+
+---
+
+### Minting an API key
+
+API keys tie a machine client to a specific user's tenant. The flow:
+
+```bash
+# 1. Sign up (or sign in if you already have an account)
+curl -s -c cookies.txt -X POST http://localhost:4000/api/auth/sign-up/email \
+  -H 'content-type: application/json' \
+  -d '{"email":"you@example.com","password":"Password123!","name":"Your Name"}'
+
+# 2. Mint an API key (requires the session cookie from step 1)
+curl -s -b cookies.txt -X POST http://localhost:4000/api/auth/api-key/create \
+  -H 'content-type: application/json' \
+  -d '{}'
+# → {"key":"<plaintext-key>", "id":"...", "referenceId":"<userId>", ...}
+# The plaintext key is shown ONLY ONCE — save it now.
+
+# 3. Use the key for machine requests
+curl -H 'x-api-key: <plaintext-key>' http://localhost:4000/v1/events
+```
+
+Additional key management endpoints (all require a valid session):
+
+| Method | Path                       | Description                               |
+| ------ | -------------------------- | ----------------------------------------- |
+| `POST` | `/api/auth/api-key/create` | Mint a new key for the authenticated user |
+| `GET`  | `/api/auth/api-key/list`   | List all keys for the authenticated user  |
+| `POST` | `/api/auth/api-key/delete` | Revoke a key by `keyId`                   |
+
+---
+
+All errors share one envelope. Missing or incorrect credentials return:
 
 ```json
 HTTP 401
