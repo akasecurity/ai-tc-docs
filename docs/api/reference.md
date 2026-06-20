@@ -558,6 +558,44 @@ curl "http://localhost:4000/v1/security/findings/timeseries?range=30d" \
 
 ---
 
+## GET /v1/security/top-sources
+
+Repos and people ranked by findings in the window, for the **Security** dashboard
+"Top sources" list. `repo` sources come from the event's `metadata.repo`; `user`
+sources are named by the user's email. Sorted by `findingsCount` descending.
+
+**Query parameters:**
+
+| Parameter | Type    | Default | Notes                            |
+| --------- | ------- | ------- | -------------------------------- |
+| `range`   | enum    | `30d`   | See shared range param above.    |
+| `limit`   | integer | `5`     | `1`–`50`.                        |
+| `kind`    | enum    | —       | `repo` or `user`; omit for both. |
+
+**Response `200 OK`:**
+
+```json
+{
+  "range": "30d",
+  "items": [
+    { "id": "repo_payments-api", "name": "payments-api", "kind": "repo", "findingsCount": 38 },
+    { "id": "user_maya-chen", "name": "maya@example.com", "kind": "user", "findingsCount": 21 }
+  ]
+}
+```
+
+`id` is stable for linking to the source's detail view. A `user` source with no
+catalog email falls back to the user id as its `name`.
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/security/top-sources?range=30d&limit=5" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
 ## Error responses
 
 All error responses follow the same shape:
