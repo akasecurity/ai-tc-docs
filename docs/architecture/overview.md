@@ -41,8 +41,10 @@ AKA enforces strict import boundaries via `eslint-plugin-boundaries`. Violating 
 apps/backend/routes       →  @aka/schema (Zod only), services/
 apps/backend/services     →  repositories/
 apps/backend/repositories →  @aka/schema/drizzle/*, drizzle-orm
-apps/plugin-*             →  @aka/plugin-sdk
-@aka/plugin-sdk           →  @aka/detections, @aka/client, @aka/schema
+apps/plugin-*             →  @aka/plugin-sdk, @aka/plugin-runtime
+@aka/plugin-runtime       →  @aka/plugin-sdk, @aka/persistence, @aka/client, @aka/schema
+@aka/plugin-sdk           →  @aka/detections, @aka/client, @aka/persistence, @aka/schema
+@aka/persistence          →  node:sqlite, @aka/schema (no Drizzle, no @aka/detections)
 @aka/client               →  fetch (only package allowed to call fetch)
 @aka/config               →  process.env (only package allowed to read env)
 @aka/detections           →  @aka/schema (no I/O, no Node-API deps)
@@ -56,13 +58,20 @@ Three cross-cutting rules every contributor must remember:
 
 ## Local-first plugin & optional backend (Phase 1)
 
-The plugin is fully useful with **zero backend and zero Docker**. It owns a local
-SQLite store at `~/.aka/data/aka.db` and is the always-present writer of `events`
-and `findings`; detection runs in-process and results surface through slash
-commands (`/aka:health`, `/aka:findings`, `/aka:recommend`, `/aka:audit`). This
-on-disk layout and the data layer live in `@aka/plugin-sdk` and are shared by
-every plugin (Claude Code first, VSCode/Cursor later) — a new plugin adds only a
-thin tool-specific adapter, never a copy of the storage/detection logic.
+The plugin is fully useful with **zero backend and zero Docker**. The runtime
+depends on a single **`DataGateway`** port (defined in `@aka/plugin-sdk`);
+`@aka/plugin-runtime` resolves the implementation from the run mode:
+
+- **standalone** (default) → a SQLite store at `~/.aka/data/aka.db` via
+  `@aka/persistence` — the always-present writer of `events` and `findings`.
+- **attached** → the (local) backend's HTTP API via `@aka/client`; the plugin
+  also pulls the org's centrally-managed ruleset into a cache and detects with it.
+
+Detection runs in-process in either mode, and results surface through slash
+commands (`/aka:health`, `/aka:findings`, `/aka:recommend`, `/aka:audit`). The
+gateway and the shared data shapes live in `@aka/plugin-sdk` / `@aka/persistence`,
+so a new plugin (Claude Code first, VSCode/Cursor later) adds only a thin
+tool-specific adapter, never a copy of the storage/detection logic.
 
 ```
  Claude Code ──hooks──▶ AKA plugin (adapter) ──▶ @aka/plugin-sdk
