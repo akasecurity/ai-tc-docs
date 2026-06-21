@@ -558,6 +558,164 @@ curl "http://localhost:4000/v1/security/findings/timeseries?range=30d" \
 
 ---
 
+## GET /v1/security/top-sources
+
+Repos and people ranked by findings in the window, for the **Security** dashboard
+"Top sources" list. `repo` sources come from the event's `metadata.repo`; `user`
+sources are named by the user's email. Sorted by `findingsCount` descending.
+
+**Query parameters:**
+
+| Parameter | Type    | Default | Notes                            |
+| --------- | ------- | ------- | -------------------------------- |
+| `range`   | enum    | `30d`   | See shared range param above.    |
+| `limit`   | integer | `5`     | `1`–`50`.                        |
+| `kind`    | enum    | —       | `repo` or `user`; omit for both. |
+
+**Response `200 OK`:**
+
+```json
+{
+  "range": "30d",
+  "items": [
+    { "id": "repo_payments-api", "name": "payments-api", "kind": "repo", "findingsCount": 38 },
+    { "id": "user_maya-chen", "name": "maya@example.com", "kind": "user", "findingsCount": 21 }
+  ]
+}
+```
+
+`id` is stable for linking to the source's detail view. A `user` source with no
+catalog email falls back to the user id as its `name`.
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/security/top-sources?range=30d&limit=5" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
+## GET /v1/security/scan-coverage
+
+Per-provider scan coverage for the **Security** dashboard "Scan coverage" card.
+In the initial release only Claude Code is scanned; other providers return
+`supported: false` (the FE greys them out / shows "Soon").
+
+**Query parameters:** `range` (see above) — accepted and echoed, but coverage is
+currently a constant business fact, not a per-window metric.
+
+**Response `200 OK`:**
+
+```json
+{
+  "range": "30d",
+  "providers": [
+    { "provider": "claudecode", "coverage": 100, "supported": true },
+    { "provider": "cursor", "coverage": 0, "supported": false },
+    { "provider": "chatgpt", "coverage": 0, "supported": false },
+    { "provider": "copilot", "coverage": 0, "supported": false },
+    { "provider": "api", "coverage": 0, "supported": false }
+  ]
+}
+```
+
+`provider` is a stable id (note `claudecode`, distinct from the event
+`sourceTool` `claude-code`). `coverage` is `0` whenever `supported` is `false`.
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/security/scan-coverage?range=30d" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
+## GET /v1/security/recommended-actions
+
+Prioritized, environment-specific suggestions for the **Security** dashboard
+"Recommended actions" list. Excludes dismissed/applied (only `open` are returned).
+
+> **Status:** the recommendation **engine** that generates these rows, and the
+> executor that performs the underlying change on apply, are not built yet. Rows
+> are created via the dev seed; `apply` transitions status and echoes the action
+> but does not yet perform the concrete mutation.
+
+**Query parameters:**
+
+| Parameter | Type    | Default | Notes     |
+| --------- | ------- | ------- | --------- |
+| `limit`   | integer | `3`     | `1`–`20`. |
+
+**Response `200 OK`:**
+
+```json
+{
+  "items": [
+    {
+      "id": "rec_01HZX",
+      "category": "block_credentials",
+      "severity": "critical",
+      "title": "Block AWS keys in payments-api",
+      "description": "5 access keys reached Claude Code prompts this week. Promote the policy from warn to block for this repo.",
+      "subjects": [
+        { "type": "repo", "id": "payments-api", "label": "payments-api" },
+        { "type": "policy", "id": "pol_8821", "label": "Block cloud credentials" }
+      ],
+      "action": {
+        "mode": "apply",
+        "type": "promote_policy_to_block",
+        "label": "Promote to block",
+        "policyId": "pol_8821"
+      }
+    }
+  ]
+}
+```
+
+`action.mode` is `apply` (mutation via the apply endpoint) or `navigate` (the FE
+deep-links `action.href`, no server call). `category` and `action.type` are
+extensible.
+
+---
+
+## POST /v1/security/recommended-actions/{id}/apply
+
+Approve a recommendation: resolves it (drops it off the list) and echoes the
+action that was applied. Only valid when `action.mode === "apply"`.
+
+- **Path params:** `id` — the recommendation id.
+- **Body:** none.
+
+**Response `200 OK`:**
+
+```json
+{
+  "id": "rec_01HZX",
+  "status": "applied",
+  "appliedAction": { "type": "promote_policy_to_block", "policyId": "pol_8821" }
+}
+```
+
+**Errors:**
+
+| Status | `code`                     | When                                               |
+| ------ | -------------------------- | -------------------------------------------------- |
+| `404`  | `recommendation_not_found` | Unknown id, or not visible to the caller's tenant. |
+| `409`  | `already_resolved`         | Already applied or dismissed.                      |
+| `422`  | `not_applicable`           | `action.mode` is `navigate` (nothing to apply).    |
+
+## POST /v1/security/recommended-actions/{id}/dismiss
+
+Dismiss a recommendation (drops it off the list).
+
+- **Path params:** `id`. **Body:** none.
+- **Response `200 OK`:** `{ "id": "rec_01HZX", "status": "dismissed" }`
+- **Errors:** `404 recommendation_not_found`; `409 already_resolved`.
+
+---
+
 ## Error responses
 
 All error responses follow the same shape:
