@@ -115,6 +115,16 @@ instead of on the host, use the full compose file — see [Docker](docker.md):
 docker compose -f docker/docker-compose.dev.yml up
 ```
 
+To also bring up tracing (Jaeger) and metrics (Prometheus), add the opt-in
+observability profile and enable OpenTelemetry:
+
+```bash
+OTEL_ENABLED=true docker compose -f docker/docker-compose.dev.yml --profile observability up
+# Jaeger → http://localhost:16686 ; Prometheus → http://localhost:9090
+```
+
+See [Observability](../operations/observability.md) for the full guide.
+
 ## Environment variable quick reference
 
 ```bash

@@ -118,17 +118,30 @@ docker compose --env-file .env -f docker/docker-compose.yml up -d
 
 ## Health checks
 
-The production container runs `/healthz` as a Docker health check:
+The production container's Docker `HEALTHCHECK` targets the **readiness** probe, so the container reports unhealthy when its database is unreachable (not merely when the process is up):
 
 ```dockerfile
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://localhost:4000/healthz').then(r=>process.exit(r.ok?0:1))"
+HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/healthz/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 ```
 
 ```bash
 docker inspect aka --format '{{.State.Health.Status}}'
 # → healthy
 ```
+
+Three probes are available (all unauthenticated): `/healthz` (overall), `/healthz/live` (liveness — map a Kubernetes `livenessProbe` here), and `/healthz/ready` (readiness, `503` when a dependency is down — map a `readinessProbe` here). See the [API reference](../api/reference.md).
+
+## Observability (OpenTelemetry)
+
+Telemetry is **off by default**. The collector, Jaeger, and Prometheus are an opt-in compose profile, so a plain `docker compose up` adds no extra containers and no overhead:
+
+```bash
+OTEL_ENABLED=true docker compose -f docker/docker-compose.yml --profile observability up
+# Jaeger → http://localhost:16686 ; Prometheus → http://localhost:9090
+```
+
+To ship to a managed backend (AWS CloudWatch/X-Ray, Azure Monitor) instead, edit `docker/otel-collector-config.yaml` and provide vendor credentials to the collector — no app rebuild. Full guide: [Observability](../operations/observability.md).
 
 ## Persistent data
 

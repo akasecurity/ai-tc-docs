@@ -134,6 +134,51 @@ curl http://localhost:4000/healthz
 
 ---
 
+## GET /healthz/live
+
+Liveness probe. No authentication required. Returns `200` while the process is up and responsive — no dependency checks (a failure means "restart me"). Wire a Kubernetes `livenessProbe` here.
+
+**Response `200 OK`:**
+
+```json
+{ "status": "alive", "uptimeSeconds": 1234 }
+```
+
+---
+
+## GET /healthz/ready
+
+Readiness probe. No authentication required. Returns `200` only when every hard dependency is reachable (the database answers `SELECT 1`); otherwise **`503`** with per-check detail. Wire a Kubernetes `readinessProbe` here. The Docker image's `HEALTHCHECK` targets this endpoint.
+
+**Response `200 OK`:**
+
+```json
+{ "status": "ready", "checks": [{ "name": "database", "status": "pass", "latencyMs": 1 }] }
+```
+
+**Response `503 Service Unavailable`:**
+
+```json
+{
+  "status": "not_ready",
+  "checks": [
+    { "name": "database", "status": "fail", "latencyMs": 30, "detail": "connection refused" }
+  ]
+}
+```
+
+---
+
+## GET /metrics
+
+Prometheus metrics endpoint, served on a dedicated port (`PROMETHEUS_METRICS_PORT`, default `9464`) only when `OTEL_ENABLED=true` and `OTEL_METRICS_EXPORTER` includes `prometheus`. See [Observability](../operations/observability.md).
+
+```bash
+curl http://localhost:9464/metrics
+```
+
+---
+
 ## POST /v1/events
 
 Ingest a batch of events. Deduplicates by `event.id` — re-sending the same ID is safe and returns `duplicates: 1`.

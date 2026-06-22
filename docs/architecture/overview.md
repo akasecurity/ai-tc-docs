@@ -263,6 +263,17 @@ The generated migration (`drizzle/postgres/0000_*.sql`) contains:
 
 The current auth hook is a single-user bearer token stub. Real multi-tenancy (Better Auth + row-level tenantId filtering via `SET LOCAL app.tenant_id`) is planned for Week 3. The schema and repository layer are already tenancy-aware — every row carries a `tenant_id`, RLS policies are declared in the Postgres dialect, and the FORCE companion migration is in place.
 
+## Observability (OpenTelemetry)
+
+The system is instrumented with OpenTelemetry for distributed tracing, metrics, and trace-correlated logs, following CNCF conventions. It is **off by default and zero-cost when disabled** (`OTEL_ENABLED=false`): the SDK is loaded via a `node --import` preload that returns before importing any `@opentelemetry/*` code unless enabled, and hot-path code (the DB span wrapper, outgoing header injection) short-circuits on a boolean.
+
+- **Collector-centric.** Apps only ever emit OTLP to an OpenTelemetry Collector, which fans out to Jaeger (traces) + Prometheus (metrics) by default, or to AWS CloudWatch/X-Ray or Azure Monitor by collector config alone — vendor choice never touches app code.
+- **Coverage.** HTTP/Fastify/Postgres via auto-instrumentation; an explicit `db.query` span + metric at the `runInScope` chokepoint covers SQLite (no auto-instrumentation) and Postgres; auth lookups get spans. `@aka/client` injects W3C `traceparent` + a correlation id on every outgoing call, so plugin→backend→DB→registry is one trace.
+- **Correlation.** Every request reuses/echoes `x-request-id` (the trace id when present) and every log line carries `trace_id`/`span_id`.
+- **Probes.** `/healthz/live` is a dependency-free liveness check; `/healthz/ready` is dependency-aware readiness (`503` when the DB ping fails). Both are always available regardless of `OTEL_ENABLED`.
+
+Implementation lives in `@aka/telemetry` (shared SDK bootstrap) with per-service `--import` preloads; the runtime keeps `@opentelemetry/*` external because its instrumentation uses dynamic `require()`s a bundle cannot express. See [Observability](../operations/observability.md).
+
 ## Follow-ups (known gaps)
 
 **Dialect-explicit schema type aliases:** the former `CatalogSchema`/`TenantSchema` aliases were SQLite-typed only, so a Postgres handle had no type to describe it. They are replaced by dialect-explicit aliases in `@aka/schema/drizzle`: `SqliteSchema`/`PgSchema` (the full combined handles) and the logical seams `SqliteCatalogSchema`, `SqliteTenantSchema`, `PgCatalogSchema`, `PgTenantSchema`. Each is derived with `Pick<...>` over the runtime `sqliteSchema`/`pgSchema` objects, so the types cannot drift from what `drizzle()` actually receives — a misspelled or removed table is a compile error, and new tables are tracked automatically. The dialect is part of the name because a Postgres table is not assignable to a SQLite one. Locked by type-level assertions in `packages/schema/src/drizzle/schema-types.test.ts` (enforced by `tsc --noEmit`).

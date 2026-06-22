@@ -57,6 +57,23 @@ AKA uses [Better Auth](https://better-auth.com) for identity in non-local modes.
 
 `AKA_LOCAL_TOKEN` must **not** be set for `MODE=dev|hosted|self-hosted`. Setting it will cause a startup validation failure. It is only valid for `local`/`test` modes where Better Auth is not used.
 
+### Observability (OpenTelemetry)
+
+OpenTelemetry is **off by default** and carries zero overhead when disabled — the SDK is never loaded and no telemetry code runs. Set `OTEL_ENABLED=true` to turn on distributed tracing, metrics, and trace-correlated logs. See [Observability](../operations/observability.md) for the full guide.
+
+| Variable                      | Default                      | Description                                                                                |
+| ----------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------ |
+| `OTEL_ENABLED`                | `false`                      | Master switch. When `false`, the OTel SDK is never started — zero overhead.                |
+| `OTEL_SERVICE_NAME`           | per-service                  | `service.name` resource attribute. Defaults to `aka-backend` / `aka-registry`.             |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://otel-collector:4318` | Base OTLP endpoint of the collector. Apps emit OTLP; the collector fans out to backends.   |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf`              | OTLP wire protocol. Only `http/protobuf` is supported.                                     |
+| `OTEL_TRACES_SAMPLER_ARG`     | `1.0`                        | Parent-based trace sampling ratio in `[0,1]` (`1.0` = sample everything).                  |
+| `OTEL_METRICS_EXPORTER`       | `otlp,prometheus`            | Comma list of metric readers: `otlp` (push to collector) and/or `prometheus` (pull).       |
+| `PROMETHEUS_METRICS_PORT`     | `9464`                       | Port the Prometheus exporter self-serves `/metrics` on (when `prometheus` is in the list). |
+| `OTEL_LOG_LEVEL`              | `info`                       | OTel internal diagnostic log level: `none`, `error`, `warn`, `info`, `debug`, `verbose`.   |
+
+The dashboard (browser tracing) uses the build-time equivalents `VITE_OTEL_ENABLED` and `VITE_OTEL_EXPORTER_OTLP_ENDPOINT`; when `VITE_OTEL_ENABLED` is unset, the OpenTelemetry web SDK is dead-code-eliminated from the bundle.
+
 ### Postgres roles
 
 AKA uses two distinct Postgres roles to keep schema ownership separate from runtime access and to ensure `FORCE ROW LEVEL SECURITY` is never bypassed.
