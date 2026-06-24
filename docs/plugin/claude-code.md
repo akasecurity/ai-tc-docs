@@ -116,16 +116,27 @@ node apps/plugin-claude-code/scripts/query.js findings
 
 ## Configuration
 
-`/aka:setup` is a two-step onboarding wizard that records local preferences to `~/.aka/settings/settings.json` (created `0600`, owner-only) via `scripts/onboard.js`:
+`/aka:setup` is a three-step onboarding wizard that records local preferences to `~/.aka/settings/settings.json` (created `0600`, owner-only) via `scripts/onboard.js`:
 
 ```json
-{ "specVersion": 1, "runMode": "standalone", "policy": "redact", "onboardedAt": "2026-06-18T..." }
+{
+  "specVersion": 2,
+  "runMode": "standalone",
+  "policy": "redact",
+  "historicalAccess": "session-only",
+  "onboardedAt": "2026-06-18T..."
+}
 ```
 
 - **`runMode`** — `standalone` (default, no Docker) or `attached` (wired to a local backend). The runtime resolves its data path from this value via the **`DataGateway`** port (`@aka/plugin-runtime`): standalone reads/writes the local SQLite store at `~/.aka/data/aka.db` (`@aka/persistence`); attached goes through the backend's HTTP API (`@aka/client`) and pulls the org's centrally-managed ruleset into a local cache that drives in-process detection.
 - **`policy`** — `redact` (replace sensitive values in place where the host allows) or `warn` (surface a warning, never modify content).
+- **`historicalAccess`** — `session-only` (default) or `full`. Consent for scanning pre-install surfaces — scratch/temp files, agent memory and prior conversation transcripts — for already-leaked secrets. Defaults to `session-only` so historical scanning is always an explicit opt-in, never an assumed grant on upgrade; declining still leaves AKA the working tree, the live session, git history and pointed scans to review.
 
-The settings file is **versioned** (`specVersion`): a future onboarding step is one more optional field, and an older `settings.json` still parses with the missing key taking its default.
+The settings file is **versioned** (`specVersion`): each onboarding step is one more optional field, and an older `settings.json` still parses with the missing key taking its default — so a file written before `historicalAccess` existed loads as `session-only`.
+
+### Historical backfill scan
+
+When `historicalAccess: full` is chosen, `/aka:setup` runs `scripts/backfill.js` at the end of onboarding. It sweeps prior Claude Code transcripts (`~/.claude/projects/*/*.jsonl`, all projects, last 30 days), extracts user prompts and assistant replies, and feeds each through the **same** detect→mask→record path the live hooks use — so secrets that leaked _before_ AKA was installed surface in `/findings` alongside live ones. Findings carry their original transcript timestamp (not scan time), and only messages that actually match a rule are persisted. Tool inputs/outputs are not yet scanned. The scan is **idempotent** — it loads the store's existing content hashes and skips any message already recorded — so re-running `/aka:setup` re-scans without ever duplicating findings, and a cleared store re-scans in full. Fully fail-open. After install, no backfill is needed — the `UserPromptSubmit`/`PreToolUse`/`PostToolUse` hooks already see everything.
 
 Environment variables are **not** used: hooks are processes spawned by Claude Code, so a slash command cannot inject env into them — a file is the only reliable channel.
 
