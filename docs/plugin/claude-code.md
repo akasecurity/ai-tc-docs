@@ -16,7 +16,8 @@ apps/plugin-claude-code/
 │   ├── health.md        #   /aka:health   — detection activity + posture
 │   ├── findings.md      #   /aka:findings — recent findings (masked)
 │   ├── recommend.md     #   /aka:recommend— top recommendations
-│   └── audit.md         #   /aka:audit    — recent enforcement decisions
+│   ├── audit.md         #   /aka:audit    — recent enforcement decisions
+│   └── scan.md          #   /aka:scan     — scan working tree for code flaws
 └── scripts/*.js         # built scripts (tsup output, self-contained):
                          #   hooks + query.js (read surface) + onboard.js
 ```
@@ -107,6 +108,7 @@ Findings persist locally to a SQLite store at `~/.aka/data/aka.db`, so the plugi
 | `/aka:findings`  | recent findings with rule, category, severity, action, and the **masked** match |
 | `/aka:recommend` | findings grouped by category (ranked by severity, then frequency) + next steps  |
 | `/aka:audit`     | the decision log — recent detections and the action AKA took                    |
+| `/aka:scan`      | scan working-tree source files for insecure code patterns (OWASP Top 10)        |
 
 The raw matched secret is **never** stored or shown — only a masked form. All four are read-only; they never mutate the database. They also work directly:
 

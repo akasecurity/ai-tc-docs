@@ -1,6 +1,6 @@
 # Built-in Rules
 
-AKA ships six rule packs out of the box with over 60 detection rules. All rules include positive and negative fixtures that run as part of the test suite.
+AKA ships seven rule packs out of the box with over 90 detection rules. All rules include positive and negative fixtures that run as part of the test suite.
 
 ## core-pii
 
@@ -121,6 +121,43 @@ Detects internal code and infrastructure context that should not leave the organ
 | `internal-url`    | low      | keyword | Dev/staging environment URLs                        |
 | `feature-flag`    | low      | keyword | Feature flag / toggle names                         |
 | `db-table-name`   | low      | keyword | Internal SQL table names                            |
+
+## code-flaws
+
+**Location:** `rules/code-flaws/`
+
+Detects insecure code patterns across Python, JS/TS, Java, Ruby, PHP, and .NET. Rules fire on both code written by Claude (PreToolUse on `Write`/`Edit`) and existing code read from disk (PostToolUse on `Read`). 28 rules covering OWASP Top 10 and related weaknesses.
+
+| Rule ID                     | Severity | Matcher | Description                                                                                     |
+| --------------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------- |
+| `sql-inject-concat`         | high     | regex   | SQL queries built with string concatenation (`+` or `.`)                                        |
+| `sql-inject-format`         | high     | regex   | SQL queries via Python `%` format or f-strings                                                  |
+| `sql-inject-interp`         | high     | regex   | SQL queries via Ruby `#{}` or PHP `$var` interpolation                                          |
+| `cmd-inject-shell`          | critical | regex   | `subprocess.*shell=True` near user-controlled input                                             |
+| `cmd-inject-exec`           | critical | regex   | Java `Runtime.getRuntime().exec()` near user input                                              |
+| `cmd-inject-node-exec`      | critical | regex   | Node.js `exec`/`execSync` with non-literal argument near user input                             |
+| `xss-inner-html`            | high     | keyword | `.innerHTML =` / `.innerHTML=` assignments                                                      |
+| `xss-dangerously-set`       | high     | keyword | React `dangerouslySetInnerHTML`                                                                 |
+| `xss-unescaped-render`      | high     | regex   | `raw()`, `.html_safe`, `\| safe`, `mark_safe()` in templates                                    |
+| `deser-pickle`              | critical | regex   | Python `pickle.loads()` / `pickle.load()`                                                       |
+| `deser-yaml-unsafe`         | high     | regex   | `yaml.load()` without `SafeLoader`                                                              |
+| `deser-java-ois`            | critical | regex   | Java `ObjectInputStream` + `readObject()`                                                       |
+| `hardcoded-password`        | high     | regex   | `password`/`passwd`/`pwd` assigned a high-entropy string literal                                |
+| `hardcoded-secret-key`      | high     | regex   | `secret_key`/`api_key`/`auth_token` assigned a high-entropy string literal                      |
+| `dev-debug-enabled`         | medium   | regex   | `DEBUG = True` / `debug: true` in config                                                        |
+| `dev-placeholder-secret`    | high     | keyword | Placeholder strings (`changeme`, `your-secret`, etc.) near key/token fields                     |
+| `dev-wildcard-cors`         | medium   | regex   | CORS wildcard: `Access-Control-Allow-Origin: *`, `origin: '*'`, `CORS_ALLOW_ALL_ORIGINS = True` |
+| `auth-ssl-verify-false`     | high     | regex   | `requests.*verify=False` disabling TLS validation                                               |
+| `auth-jwt-no-verify`        | critical | regex   | JWT decoded with `verify=False` / `algorithms=[]` near jwt/decode/token                         |
+| `path-traversal-open`       | high     | regex   | `open(request.*` / `open(params.*` with user-controlled path                                    |
+| `path-traversal-join`       | high     | regex   | `os.path.join(base, user_*)` with user-controlled component                                     |
+| `crypto-weak-hash-md5`      | medium   | regex   | MD5 used as a hash (`hashlib.md5`, `MessageDigest("MD5")`, `Digest::MD5`)                       |
+| `crypto-weak-hash-sha1`     | medium   | regex   | SHA-1 used near password/credential/token context                                               |
+| `crypto-insecure-random`    | medium   | regex   | `Math.random()` / `random.random()` near security-sensitive labels                              |
+| `prototype-pollution-merge` | high     | regex   | `Object.assign(target, req.body)` / `_.merge(target, request.*)`                                |
+| `eval-dynamic-exec`         | critical | regex   | `eval`/`exec` with non-literal argument near user input                                         |
+| `ssrf-user-url`             | high     | regex   | `fetch`/`axios`/`requests.get` called directly with `req.*`/`params.*`                          |
+| `regex-redos-backtrack`     | medium   | regex   | Catastrophic backtracking patterns like `(a+)+`                                                 |
 
 ## Running the test suite
 
