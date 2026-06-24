@@ -771,6 +771,379 @@ All error responses follow the same shape:
 | `401`  | `{"error": "Unauthorized"}`                                               | Missing/invalid Bearer token |
 | `500`  | `{"statusCode": 500, "error": "Internal Server Error", "message": "..."}` | Unhandled exception          |
 
+**Error code convention:**
+
+- **`UPPER_SNAKE`** — framework / Zod validation codes (`VALIDATION_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`, etc.) emitted by the shared error handler.
+- **`lower_snake`** — domain-specific codes emitted explicitly by services/routes (`installed_pack_not_found`, `detection_not_found`, `invalid_detection_id`, `already_imported`, `already_up_to_date`). New detections endpoints use this convention.
+
+Both are wrapped in the same envelope: `{ "error": { "code": "...", "message": "..." } }`.
+
+---
+
+## PATCH /v1/installed-packs/:namespace/:packId
+
+Toggle the `enabled` flag on an installed detection pack. Requires an authenticated session.
+
+**Path params:**
+
+| Param       | Description                            |
+| ----------- | -------------------------------------- |
+| `namespace` | Pack publisher namespace (e.g. `aka`)  |
+| `packId`    | Pack identifier (e.g. `cloud-secrets`) |
+
+**Request body:**
+
+```json
+{ "enabled": true }
+```
+
+At least one field must be present — an empty body `{}` returns `400 VALIDATION_ERROR`.
+
+**Response `200 OK`** — the updated `InstalledPack` resource:
+
+```json
+{
+  "id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "tenantId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+  "namespace": "aka",
+  "packId": "cloud-secrets",
+  "version": "2.3.1",
+  "name": "Cloud Credentials",
+  "enabled": true
+}
+```
+
+**Errors:**
+
+| Status | `code`                     | Convention  | When                                             |
+| ------ | -------------------------- | ----------- | ------------------------------------------------ |
+| `400`  | `VALIDATION_ERROR`         | UPPER_SNAKE | Body is empty or does not match the schema (Zod) |
+| `401`  | `UNAUTHORIZED`             | UPPER_SNAKE | No valid auth token                              |
+| `404`  | `installed_pack_not_found` | lower_snake | No installed pack with that namespace/packId     |
+
+> **Permission note:** this endpoint does NOT currently return `403 Forbidden`. The codebase has no read/write permission layer — all authenticated tenant users are full-access. Do not build frontend logic against a `403` response; it will not fire.
+
+**Example:**
+
+```bash
+curl -X PATCH "http://localhost:4000/v1/installed-packs/aka/cloud-secrets" \
+  -H "Authorization: Bearer mytoken1234567890" \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": false}'
+```
+
+---
+
+## GET /v1/detections/stats
+
+Returns aggregate statistics for the authenticated tenant's installed detections.
+
+- `detections` — total installed pack count.
+- `rules` — sum of rule counts from the `rulesJson` snapshot across all packs.
+- `active` — count of installed packs where `enabled = true`.
+- `findingsLast30d` — findings produced by the tenant's installed rule-id set in the trailing 30 days.
+
+**Response `200 OK`:**
+
+```json
+{
+  "detections": 6,
+  "rules": 12,
+  "active": 5,
+  "findingsLast30d": 1123
+}
+```
+
+When no packs are installed all values are `0`.
+
+**Errors:**
+
+| Status | `code`         | Convention  | When                |
+| ------ | -------------- | ----------- | ------------------- |
+| `401`  | `UNAUTHORIZED` | UPPER_SNAKE | No valid auth token |
+
+> **Permission note:** this endpoint does NOT return `403 Forbidden` — no read/write permission layer exists yet. All authenticated tenant users are full-access.
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/detections/stats" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
+## GET /v1/detections
+
+List installed detections with optional filter and search.
+
+**Query parameters:**
+
+| Parameter | Type   | Default | Description                                                                                |
+| --------- | ------ | ------- | ------------------------------------------------------------------------------------------ |
+| `filter`  | enum   | `all`   | `all` \| `library` \| `custom` \| `customized` \| `updates`                                |
+| `q`       | string | —       | Case-insensitive substring search over `name`, `packId`, and `namespace` (not description) |
+
+**Sorting:** enabled packs first, then alphabetically by name ascending.
+
+**Fixed values in v1:**
+
+- `origin` is always `"library"` (no custom-authoring model).
+- `counts.customized` and `counts.updates` are always `0` (branching model deferred; update-available is lazy on detail only).
+- `filter=customized` and `filter=updates` always return an empty `items` array.
+
+**Response `200 OK`:**
+
+```json
+{
+  "counts": {
+    "all": 4,
+    "library": 4,
+    "custom": 0,
+    "customized": 0,
+    "updates": 0
+  },
+  "items": [
+    {
+      "id": "aka/cloud-secrets",
+      "name": "Cloud Credentials",
+      "version": "2.3.1",
+      "enabled": true,
+      "origin": "library",
+      "namespace": "aka",
+      "packId": "cloud-secrets",
+      "ruleCount": 3
+    }
+  ]
+}
+```
+
+`items[].id` is the **un-encoded** `namespace/packId` slug. Clients `encodeURIComponent(id)` when addressing the detail or update endpoint (PR-2).
+
+`counts` are computed over the **unfiltered** set — `q` narrows `items` only, not the counts.
+
+**Errors:**
+
+| Status | `code`         | Convention  | When                |
+| ------ | -------------- | ----------- | ------------------- |
+| `401`  | `UNAUTHORIZED` | UPPER_SNAKE | No valid auth token |
+
+> **Permission note:** this endpoint does NOT return `403 Forbidden` — no read/write permission layer exists yet. All authenticated tenant users are full-access.
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/detections?q=cloud" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
+## GET /v1/detections/:id
+
+Return full detail for a single installed detection. `:id` is the **URL-encoded** `namespace%2FpackId` slug (e.g. `aka%2Fcloud-secrets`).
+
+The list endpoint emits `items[].id` as the un-encoded `namespace/packId` string. Clients encode it via `encodeURIComponent(id)` when calling this endpoint.
+
+**Path params:**
+
+| Param | Description                                                     |
+| ----- | --------------------------------------------------------------- |
+| `:id` | URL-encoded `namespace/packId` slug, e.g. `aka%2Fcloud-secrets` |
+
+**Behaviour:**
+
+- Rules are served from the **local `rulesJson` snapshot** — authoritative, never blocked by registry downtime.
+- `update` is computed lazily by calling the registry. If the registry is unreachable, `update` degrades to `null` (honestly unknown) and the response is still `200`.
+- `findingsLast30d` counts findings for this pack's rule-id set over the trailing 30 days.
+- Only `regex` matcher type is returned (the engine does not support `hash_index`, `ml_classifier`, or `script`).
+
+**Response `200 OK`:**
+
+```json
+{
+  "id": "aka/cloud-secrets",
+  "name": "Cloud Credentials",
+  "version": "2.3.1",
+  "enabled": true,
+  "origin": "library",
+  "namespace": "aka",
+  "packId": "cloud-secrets",
+  "ruleCount": 3,
+  "editedAt": "2026-06-01T00:00:00.000Z",
+  "findingsLast30d": 42,
+  "latestVersion": "2.5.0",
+  "update": { "available": true, "latestVersion": "2.5.0" },
+  "rules": [
+    {
+      "id": "aka/cloud-rule",
+      "name": "Cloud Rule",
+      "category": "secret",
+      "severity": "high",
+      "matcher": { "type": "regex", "pattern": "\\bAKIA\\w+", "flags": "g" }
+    }
+  ],
+  "modified": false
+}
+```
+
+When the registry is unreachable, `"update": null` and `"latestVersion": null`.
+
+**Errors:**
+
+| Status | `code`                 | Convention  | When                                                  |
+| ------ | ---------------------- | ----------- | ----------------------------------------------------- |
+| `400`  | `invalid_detection_id` | lower_snake | Malformed `:id` — not a valid `namespace/packId` slug |
+| `401`  | `UNAUTHORIZED`         | UPPER_SNAKE | No valid auth token                                   |
+| `404`  | `detection_not_found`  | lower_snake | No installed pack matching the id                     |
+
+> **Permission note:** this endpoint does NOT return `403 Forbidden` — no read/write permission layer exists yet.
+
+> **Proxy note:** deployments MUST NOT enable `%2F` decoding/normalization (e.g. nginx `merge_slashes`) for `/v1/detections/*`, or the `:id` route will 404 when the slug contains a literal `/`.
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/detections/aka%2Fcloud-secrets" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
+## GET /v1/detections/library
+
+Browse the registry catalog overlaid with the tenant's import state. Returns every pack the registry knows about, annotated with whether the tenant has imported it.
+
+**IMPORTANT:** this route is registered **before** `GET /v1/detections/:id` — `library` is a static path segment, not a slug.
+
+**Query parameters:**
+
+| Parameter  | Type              | Default | Description                                             |
+| ---------- | ----------------- | ------- | ------------------------------------------------------- |
+| `q`        | string            | —       | Case-insensitive search over name/publisher/description |
+| `category` | detectionCategory | —       | Filter to one category (`pii`, `secret`, etc.)          |
+
+**Response `200 OK`:**
+
+```json
+{
+  "categories": ["secret", "pii"],
+  "items": [
+    {
+      "id": "aka/cloud-secrets",
+      "name": "Cloud Credentials",
+      "publisher": "aka",
+      "version": "2.5.0",
+      "ruleCount": 0,
+      "description": "Detects cloud credentials",
+      "updatedAt": "2025-06-01T00:00:00.000Z",
+      "state": "update",
+      "importedAs": "aka/cloud-secrets"
+    }
+  ]
+}
+```
+
+**`state` values:**
+
+| Value      | Meaning                                         |
+| ---------- | ----------------------------------------------- |
+| `new`      | Not imported by this tenant                     |
+| `imported` | Imported at the current registry version        |
+| `update`   | Imported but a newer version exists in registry |
+
+**Known limitation — `ruleCount` is always `0`:** The registry catalog (`PublishedPack`) does not expose a rule count, so `ruleCount` is always `0` in library items. Frontends should treat `0` as "count unavailable" rather than "no rules". This will be resolved once the registry exposes the count in its catalog response (tracked as a registry follow-up).
+
+**Errors:**
+
+| Status | `code`                  | Convention  | When                                    |
+| ------ | ----------------------- | ----------- | --------------------------------------- |
+| `401`  | `UNAUTHORIZED`          | UPPER_SNAKE | No valid auth token                     |
+| `503`  | `registry_unconfigured` | lower_snake | `RULES_REGISTRY_URL` is not set         |
+| `502`  | `registry_error`        | lower_snake | Registry is unreachable or returned 5xx |
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/detections/library?category=secret" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
+## POST /v1/detections/import
+
+Import a pack from the registry. Resolves the latest version and installs it as an enabled detection.
+
+**IMPORTANT:** this route is registered **before** `POST /v1/detections/:id/update` — `import` is a static path segment, not a slug.
+
+**Request body:**
+
+```json
+{ "libraryId": "aka/cloud-secrets" }
+```
+
+`libraryId` must be in `namespace/packId` format — an empty or malformed value returns `400`.
+
+**Response `201 Created`** — the new `DetectionDetail` resource (same shape as `GET /v1/detections/:id`).
+
+**Errors:**
+
+| Status | `code`                  | Convention  | When                                                                            |
+| ------ | ----------------------- | ----------- | ------------------------------------------------------------------------------- |
+| `400`  | `VALIDATION_ERROR`      | UPPER_SNAKE | `libraryId` missing or malformed                                                |
+| `401`  | `UNAUTHORIZED`          | UPPER_SNAKE | No valid auth token                                                             |
+| `404`  | `library_not_found`     | lower_snake | Pack does not exist in the registry                                             |
+| `409`  | `already_imported`      | lower_snake | Pack already imported; `details.detectionId` contains the existing workspace id |
+| `503`  | `registry_unconfigured` | lower_snake | `RULES_REGISTRY_URL` is not set                                                 |
+| `502`  | `registry_error`        | lower_snake | Registry unreachable or returned 5xx                                            |
+
+**Example:**
+
+```bash
+curl -X POST "http://localhost:4000/v1/detections/import" \
+  -H "Authorization: Bearer mytoken1234567890" \
+  -H "Content-Type: application/json" \
+  -d '{"libraryId": "aka/webhook-tokens"}'
+```
+
+---
+
+## POST /v1/detections/:id/update
+
+Pull the latest version of an installed detection from the registry and re-install it. No request body.
+
+**Path params:**
+
+| Param | Description                                                     |
+| ----- | --------------------------------------------------------------- |
+| `:id` | URL-encoded `namespace/packId` slug, e.g. `aka%2Fcloud-secrets` |
+
+**Behaviour:**
+
+- Fetches `latestVersion` from the registry. If the installed version already matches, returns `409 already_up_to_date`.
+- On success, upserts the pack at `latestVersion` and returns the updated `DetectionDetail`.
+
+**Response `200 OK`** — the updated `DetectionDetail` resource (same shape as `GET /v1/detections/:id`).
+
+**Errors:**
+
+| Status | `code`                  | Convention  | When                                                  |
+| ------ | ----------------------- | ----------- | ----------------------------------------------------- |
+| `400`  | `invalid_detection_id`  | lower_snake | Malformed `:id` — not a valid `namespace/packId` slug |
+| `401`  | `UNAUTHORIZED`          | UPPER_SNAKE | No valid auth token                                   |
+| `404`  | `detection_not_found`   | lower_snake | No installed pack matching the id                     |
+| `409`  | `already_up_to_date`    | lower_snake | Installed version already matches `latestVersion`     |
+| `503`  | `registry_unconfigured` | lower_snake | `RULES_REGISTRY_URL` is not set                       |
+| `502`  | `registry_error`        | lower_snake | Registry unreachable or returned 5xx                  |
+
+**Example:**
+
+```bash
+curl -X POST "http://localhost:4000/v1/detections/aka%2Fcloud-secrets/update" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
 ---
 
 ## Planned endpoints
