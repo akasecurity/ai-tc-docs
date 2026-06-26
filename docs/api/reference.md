@@ -1146,13 +1146,343 @@ curl -X POST "http://localhost:4000/v1/detections/aka%2Fcloud-secrets/update" \
 
 ---
 
+## GET /v1/findings/stats
+
+Returns unfiltered totals for the authenticated tenant's findings — drives the navigation badge count.
+
+**operationId:** `getFindingStats`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**Response `200 OK`:**
+
+```json
+{
+  "findings": 131,
+  "groups": 22,
+  "bySeverity": { "critical": 4, "high": 9, "medium": 6, "low": 3 }
+}
+```
+
+`findings` = total instance count; `groups` = distinct rule groups; `bySeverity` counts groups (not instances).
+
+> **Note:** counts are computed in-memory over the most recent findings and are
+> approximate for very large tenants (currently capped at ~2000 findings). Exact
+> totals land with the planned SQL aggregation (`COUNT … GROUP BY`). Treat the
+> badge as indicative, not authoritative, at high volume.
+
+**Errors:**
+
+| Status | `code`         | When                |
+| ------ | -------------- | ------------------- |
+| `401`  | `UNAUTHORIZED` | No valid auth token |
+
+> **Permission note:** read endpoints are open to all authenticated tenant users; there is no read-side permission split.
+
+---
+
+## GET /v1/findings/flat
+
+Returns a flat, paginated list of individual finding instances — the feed consumed by the plugin and CLI. The dashboard uses the grouped `GET /v1/findings` instead.
+
+**operationId:** `listFindingsFlat`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**IMPORTANT:** registered **before** `GET /v1/findings/:groupId` — `flat` is a static segment and is never captured as a `:groupId` param.
+
+**Query parameters:**
+
+| Parameter  | Type          | Default | Description                                   |
+| ---------- | ------------- | ------- | --------------------------------------------- |
+| `limit`    | integer 1–200 | `50`    | Page size                                     |
+| `cursor`   | string        | —       | Opaque pagination cursor from `nextCursor`    |
+| `severity` | string        | —       | Filter by severity (`critical`, `high`, etc.) |
+| `category` | string        | —       | Filter by detection category                  |
+| `eventId`  | UUID          | —       | Filter to findings for a specific event       |
+
+**Response `200 OK`** — flat `ListFindingsResponse`:
+
+```json
+{
+  "items": [
+    {
+      "id": "10000000-0000-0000-0000-000000000001",
+      "tenantId": "t1",
+      "eventId": "e0000000-0000-0000-0000-000000000001",
+      "ruleId": "aka/aws-key",
+      "category": "secret",
+      "severity": "high",
+      "span": { "start": 12, "end": 42 },
+      "maskedMatch": "AKIA••••••••7Q4F",
+      "actionTaken": "block",
+      "confidence": 0.95
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Each item is a raw `Finding` (flat, per-instance). `nextCursor` is `null` when no further pages exist.
+
+**Errors:**
+
+| Status | `code`             | When                                        |
+| ------ | ------------------ | ------------------------------------------- |
+| `400`  | `VALIDATION_ERROR` | Invalid query param (e.g. non-UUID eventId) |
+| `401`  | `UNAUTHORIZED`     | No valid auth token                         |
+
+---
+
+## GET /v1/findings
+
+Returns paginated, filterable, searchable finding groups with embedded instances and per-filter facet counts. Used by the dashboard.
+
+> The plugin and CLI use `GET /v1/findings/flat` (see above) which returns the flat `ListFindingsResponse` shape expected by `@aka/client`'s `listFindings()` wrapper.
+
+**operationId:** `listFindings`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**Query parameters:**
+
+| Parameter  | Type                | Default | Description                                                                             |
+| ---------- | ------------------- | ------- | --------------------------------------------------------------------------------------- |
+| `severity` | `Severity[]`        | —       | Filter by group severity (repeatable: `?severity=high&severity=critical`)               |
+| `provider` | `FindingProvider[]` | —       | Filter to groups with any matching provider (repeatable)                                |
+| `action`   | `FindingAction[]`   | —       | Filter to groups with any matching action (repeatable)                                  |
+| `subtype`  | `string[]`          | —       | Filter by group subtype (repeatable)                                                    |
+| `q`        | string              | —       | Case-insensitive search over `subtype`, `category`, `maskedValue`, `repo`, `file`, `id` |
+| `groupBy`  | `'type'`            | `type`  | Only `type` is supported currently                                                      |
+| `limit`    | integer 1–100       | `50`    | Page size (groups)                                                                      |
+| `cursor`   | string              | —       | Opaque pagination cursor from `nextCursor`                                              |
+
+**Sorting:** severity desc (critical > high > medium > low), then `latestDetectedAt` desc.
+
+**Facet semantics:** each dimension computed excluding its own filter.
+
+**Response `200 OK`:**
+
+```json
+{
+  "totals": { "findings": 22, "groups": 5 },
+  "facets": {
+    "severity": [{ "value": "high", "count": 3 }],
+    "provider": [{ "value": "claudecode", "count": 4 }],
+    "action": [{ "value": "blocked", "count": 2 }],
+    "subtype": [{ "value": "aka/aws-key", "count": 1 }]
+  },
+  "items": [
+    {
+      "id": "aka/aws-key",
+      "category": "secret",
+      "subtype": "aka/aws-key",
+      "severity": "high",
+      "match": { "maskedValue": "AKIA••••••••7Q4F", "contextPrefix": "" },
+      "detection": { "id": "aka/aws-key", "name": "Cloud Credentials" },
+      "policy": { "id": "category:secret", "name": "secret" },
+      "instanceCount": 3,
+      "providers": ["claudecode", "cursor"],
+      "aggregateAction": "blocked",
+      "latestDetectedAt": "2026-06-22T10:00:00.000Z",
+      "instances": [
+        {
+          "id": "20000000-0000-0000-0000-000000000001",
+          "provider": "claudecode",
+          "repo": "payments-api",
+          "file": "src/index.ts",
+          "action": "blocked",
+          "detectedAt": "2026-06-20T10:00:00.000Z",
+          "confidence": 0.95
+        }
+      ]
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+`aggregateAction` is `null` when instances have differing actions (Mixed). `instances` are ordered newest-first.
+
+**Errors:**
+
+| Status | `code`             | When                                                |
+| ------ | ------------------ | --------------------------------------------------- |
+| `400`  | `VALIDATION_ERROR` | Invalid query params (limit out of range, bad enum) |
+| `401`  | `UNAUTHORIZED`     | No valid auth token                                 |
+
+---
+
+## GET /v1/findings/:groupId
+
+Returns the single group object with the **complete** (uncapped) instance list.
+
+**operationId:** `getFinding`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**Path params:**
+
+| Param      | Description                    |
+| ---------- | ------------------------------ |
+| `:groupId` | Rule ID (e.g. `aka%2Faws-key`) |
+
+**Response `200 OK`** — same shape as an item from `GET /v1/findings` with the full instances array.
+
+**Errors:**
+
+| Status | `code`              | When                                                    |
+| ------ | ------------------- | ------------------------------------------------------- |
+| `401`  | `UNAUTHORIZED`      | No valid auth token                                     |
+| `404`  | `finding_not_found` | Unknown groupId, or groupId belonging to another tenant |
+
+> **Permission note:** wrong-tenant groupId returns `404` (not `403`) — existence must not leak.
+
+---
+
+## GET /v1/findings/instances/:instanceId
+
+Returns a denormalized instance detail combining `FindingInstance` fields with group-level context.
+
+**operationId:** `getFindingInstance`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**IMPORTANT:** registered **before** `GET /v1/findings/:groupId` — `instances` is a static segment.
+
+**Path params:**
+
+| Param         | Description      |
+| ------------- | ---------------- |
+| `:instanceId` | Finding row UUID |
+
+**Response `200 OK`:**
+
+```json
+{
+  "id": "20000000-0000-0000-0000-000000000001",
+  "provider": "claudecode",
+  "repo": "payments-api",
+  "file": "src/index.ts",
+  "action": "blocked",
+  "detectedAt": "2026-06-20T10:00:00.000Z",
+  "confidence": 0.95,
+  "groupId": "aka/aws-key",
+  "category": "secret",
+  "subtype": "aka/aws-key",
+  "severity": "high",
+  "match": { "maskedValue": "AKIA••••••••7Q4F", "contextPrefix": "" },
+  "detection": { "id": "aka/aws-key", "name": "Cloud Credentials" },
+  "policy": { "id": "category:secret", "name": "secret" }
+}
+```
+
+**Errors:**
+
+| Status | `code`               | When                |
+| ------ | -------------------- | ------------------- |
+| `401`  | `UNAUTHORIZED`       | No valid auth token |
+| `404`  | `instance_not_found` | Unknown instanceId  |
+
+---
+
+## POST /v1/findings/:groupId/action
+
+Writes a `finding_action_overrides` record (upsert) and returns the updated group.
+
+**operationId:** `applyFindingAction`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**Path params:**
+
+| Param      | Description          |
+| ---------- | -------------------- |
+| `:groupId` | Rule ID / group slug |
+
+**Request body:**
+
+```json
+{ "action": "allowed", "instanceId": "20000000-0000-0000-0000-000000000001" }
+```
+
+| Field        | Type            | Required | Notes                                                    |
+| ------------ | --------------- | -------- | -------------------------------------------------------- |
+| `action`     | `FindingAction` | Yes      | New enforcement decision (excludes `quarantined`)        |
+| `instanceId` | string          | No       | When omitted, applies override to all instances in group |
+
+`quarantined` is system-assigned and is excluded from the request contract, so
+sending it fails request validation → `400 VALIDATION_ERROR` (like any other
+invalid `action` value).
+
+**Response `200 OK`** — updated group (same shape as `GET /v1/findings/:groupId`).
+
+**Errors:**
+
+| Status | `code`               | When                                                             |
+| ------ | -------------------- | ---------------------------------------------------------------- |
+| `400`  | `VALIDATION_ERROR`   | Invalid `action` value (including system-assigned `quarantined`) |
+| `401`  | `UNAUTHORIZED`       | No valid auth token                                              |
+| `403`  | `forbidden`          | Caller has a read-only role (`security_viewer`)                  |
+| `404`  | `finding_not_found`  | Unknown groupId, or group has no instances                       |
+| `404`  | `instance_not_found` | `instanceId` not found or does not belong to groupId             |
+
+> **Permission note:** applying an override requires a writable role. Users with
+> the read-only `security_viewer` role get `403 forbidden`; `owner`, `admin`, and
+> `member` can apply overrides. Read endpoints remain open to all authenticated
+> tenant users.
+
+---
+
+## GET /v1/findings/export
+
+Downloads the complete filtered finding set as a file. Pagination params (`limit`, `cursor`) are ignored.
+
+**operationId:** `exportFindings`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**IMPORTANT:** registered **before** `GET /v1/findings/:groupId` — `export` is a static segment.
+
+**Query parameters:** same filter params as `GET /v1/findings` (minus `limit`/`cursor`/`groupBy`) plus:
+
+| Parameter | Type              | Default | Notes           |
+| --------- | ----------------- | ------- | --------------- |
+| `format`  | `'csv' \| 'json'` | `csv`   | Download format |
+
+**Response headers:**
+
+- `Content-Type: text/csv` (or `application/json`)
+- `Content-Disposition: attachment; filename="findings.csv"` (or `.json`)
+
+**CSV columns (normative order):** `instanceId, groupId, category, subtype, severity, provider, repo, file, action, detectedAt, confidence, policy`
+
+**Never included:** unmasked match values.
+
+**Errors:**
+
+| Status | `code`             | When                          |
+| ------ | ------------------ | ----------------------------- |
+| `400`  | `VALIDATION_ERROR` | `format=xml` or other invalid |
+| `401`  | `UNAUTHORIZED`     | No valid auth token           |
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/findings/export?format=csv" \
+  -H "Authorization: Bearer mytoken1234567890" \
+  -o findings.csv
+```
+
+---
+
+## Route registration order (findings)
+
+The 6 findings routes are registered in this order to prevent parametric routes shadowing static segments:
+
+1. `GET  /v1/findings/stats`
+2. `GET  /v1/findings/export`
+3. `GET  /v1/findings/instances/:instanceId`
+4. `GET  /v1/findings`
+5. `GET  /v1/findings/:groupId`
+6. `POST /v1/findings/:groupId/action`
+
+Fastify's find-my-way radix router prioritises static segments over parametric regardless of order — ordering is for readability and defensive correctness.
+
+---
+
 ## Planned endpoints
 
 These endpoints are defined in `packages/schema/src/zod/api.ts` but not yet implemented:
 
-| Method | Path           | Description                          |
-| ------ | -------------- | ------------------------------------ |
-| `GET`  | `/v1/findings` | List detection findings with filters |
-| `PUT`  | `/v1/policies` | Update policy bundle                 |
+| Method | Path           | Description          |
+| ------ | -------------- | -------------------- |
+| `PUT`  | `/v1/policies` | Update policy bundle |
 
 Track progress in the GitHub issues.
