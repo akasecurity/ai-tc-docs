@@ -379,6 +379,134 @@ curl -X POST http://localhost:4000/v1/policies \
 
 ---
 
+## GET /v1/policies/stats
+
+Returns aggregate counts for the built-in policy catalog. Requires an authenticated session.
+
+**Query params:** none
+
+**Response `200 OK`** — `PolicyStatsResponse`:
+
+```json
+{
+  "policies": 4,
+  "builtin": 4,
+  "custom": 0,
+  "detectionsGoverned": 2
+}
+```
+
+- `policies` = `builtin + custom` (always 4 in Milestone 1)
+- `builtin` = count of server-defined built-in policies (always 4)
+- `custom` = count of tenant-defined custom policies (always 0 in Milestone 1)
+- `detectionsGoverned` = count of installed packs with a non-null `policyId` (live DB value)
+
+**Errors:**
+
+| Status | `code`         | When                |
+| ------ | -------------- | ------------------- |
+| `401`  | `UNAUTHORIZED` | No valid auth token |
+
+> **Registration order (AC-8):** `/v1/policies/stats` is registered before `/v1/policies/:id`
+> in the route file so Fastify resolves `stats` as a static segment, not a slug parameter.
+
+**Example:**
+
+```bash
+curl http://localhost:4000/v1/policies/stats \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
+## GET /v1/policies
+
+Returns the built-in policy catalog for the authenticated tenant. Requires an authenticated session.
+
+**Query params:**
+
+| Param  | Type                    | Required | Default | Notes                        |
+| ------ | ----------------------- | -------- | ------- | ---------------------------- |
+| `kind` | `'builtin' \| 'custom'` | no       | —       | Omit to return all built-ins |
+
+**Response `200 OK`** — `ListPoliciesResponse` with `items: PolicyListItem[]`:
+
+```json
+{
+  "items": [
+    { "id": "monitor", "kind": "builtin", "name": "Monitor", "enabled": true, "usedByCount": 0 },
+    { "id": "warn", "kind": "builtin", "name": "Warn", "enabled": true, "usedByCount": 0 },
+    { "id": "redact", "kind": "builtin", "name": "Redact", "enabled": true, "usedByCount": 2 },
+    { "id": "block", "kind": "builtin", "name": "Block", "enabled": true, "usedByCount": 1 }
+  ]
+}
+```
+
+Items are always returned in the fixed order: `monitor → warn → redact → block`.
+`usedByCount` reflects the current count of installed packs assigned to each policy id.
+When `kind=custom`, returns `{ "items": [] }` (custom policies are deferred to a future milestone).
+
+**Errors:**
+
+| Status | `code`             | When                                |
+| ------ | ------------------ | ----------------------------------- |
+| `400`  | `VALIDATION_ERROR` | `kind` is not `builtin` or `custom` |
+| `401`  | `UNAUTHORIZED`     | No valid auth token                 |
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/policies?kind=builtin" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
+## GET /v1/policies/:id
+
+Returns the full detail for a single built-in policy. Requires an authenticated session.
+
+**Path params:**
+
+| Param | Description                                                   |
+| ----- | ------------------------------------------------------------- |
+| `id`  | Built-in policy slug: `monitor`, `warn`, `redact`, or `block` |
+
+**Response `200 OK`** — `PolicyDetail`:
+
+```json
+{
+  "specVersion": 1,
+  "id": "redact",
+  "kind": "builtin",
+  "name": "Redact",
+  "enabled": true,
+  "description": "Automatically strip the matched value from the request, then continue.",
+  "usedBy": [
+    { "id": "aka/us-ssn", "name": "US Social Security numbers", "ruleCount": 1, "enabled": true }
+  ]
+}
+```
+
+`usedBy` contains all installed packs in the tenant that have been assigned this `policyId`.
+Each `UsedByItem` has `id` (`${namespace}/${packId}`), `name`, `ruleCount`, and `enabled`.
+
+**Errors:**
+
+| Status | `code`             | Convention  | When                                    |
+| ------ | ------------------ | ----------- | --------------------------------------- |
+| `401`  | `UNAUTHORIZED`     | UPPER_SNAKE | No valid auth token                     |
+| `404`  | `policy_not_found` | lower_snake | `id` is not one of the 4 built-in slugs |
+
+**Example:**
+
+```bash
+curl http://localhost:4000/v1/policies/redact \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
 ## POST /v1/rules/test
 
 Runs **draft** detection rules through the engine against ad-hoc text and/or
@@ -782,7 +910,8 @@ Both are wrapped in the same envelope: `{ "error": { "code": "...", "message": "
 
 ## PATCH /v1/installed-packs/:namespace/:packId
 
-Toggle the `enabled` flag on an installed detection pack. Requires an authenticated session.
+Partially updates an installed detection pack. Supports toggling `enabled` and/or assigning a
+`policyId`. Requires an authenticated session.
 
 **Path params:**
 
@@ -791,13 +920,23 @@ Toggle the `enabled` flag on an installed detection pack. Requires an authentica
 | `namespace` | Pack publisher namespace (e.g. `aka`)  |
 | `packId`    | Pack identifier (e.g. `cloud-secrets`) |
 
-**Request body:**
+**Request body** (`PatchInstalledPackRequest`) — at least one field must be present:
+
+| Field      | Type             | Required | Notes                                                                           |
+| ---------- | ---------------- | -------- | ------------------------------------------------------------------------------- |
+| `enabled`  | `boolean`        | no       | Toggle pack on/off                                                              |
+| `policyId` | `string \| null` | no       | Assign a built-in policy (`monitor\|warn\|redact\|block`) or `null` to unassign |
+
+An empty body `{}` returns `400 VALIDATION_ERROR`.
+
+**Examples:**
 
 ```json
-{ "enabled": true }
+{ "enabled": false }
+{ "policyId": "redact" }
+{ "policyId": null }
+{ "enabled": false, "policyId": "block" }
 ```
-
-At least one field must be present — an empty body `{}` returns `400 VALIDATION_ERROR`.
 
 **Response `200 OK`** — the updated `InstalledPack` resource:
 
@@ -809,19 +948,29 @@ At least one field must be present — an empty body `{}` returns `400 VALIDATIO
   "packId": "cloud-secrets",
   "version": "2.3.1",
   "name": "Cloud Credentials",
-  "enabled": true
+  "enabled": true,
+  "policyId": "redact"
 }
 ```
+
+`policyId` is absent when the field is null/unassigned (nullable-optional pattern).
 
 **Errors:**
 
 | Status | `code`                     | Convention  | When                                             |
 | ------ | -------------------------- | ----------- | ------------------------------------------------ |
 | `400`  | `VALIDATION_ERROR`         | UPPER_SNAKE | Body is empty or does not match the schema (Zod) |
+| `400`  | `unknown_policy`           | lower_snake | `policyId` is not one of the 4 built-in slugs    |
 | `401`  | `UNAUTHORIZED`             | UPPER_SNAKE | No valid auth token                              |
 | `404`  | `installed_pack_not_found` | lower_snake | No installed pack with that namespace/packId     |
 
 > **Permission note:** this endpoint does NOT currently return `403 Forbidden`. The codebase has no read/write permission layer — all authenticated tenant users are full-access. Do not build frontend logic against a `403` response; it will not fire.
+
+> **Half-state note (Milestone 1):** `policyId` is recorded in the database and surfaced in
+> the API, but the enforcement engine currently uses category-based policies
+> (`mergePolicyBundle`/`resolveAction`) — not `policyId`. Assigning `block` to a `pii`-category
+> pack shows `block` in the UI, but the engine still executes `redact`. A future milestone
+> will rewire enforcement to honour `policyId`.
 
 **Example:**
 
@@ -829,7 +978,7 @@ At least one field must be present — an empty body `{}` returns `400 VALIDATIO
 curl -X PATCH "http://localhost:4000/v1/installed-packs/aka/cloud-secrets" \
   -H "Authorization: Bearer mytoken1234567890" \
   -H "Content-Type: application/json" \
-  -d '{"enabled": false}'
+  -d '{"policyId": "block"}'
 ```
 
 ---
