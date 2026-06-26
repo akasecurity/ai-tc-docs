@@ -205,10 +205,10 @@ Response
 
 The Drizzle schema lives in `packages/schema/src/drizzle/` and is split into two logical groups:
 
-| Group       | Tables                           | File pair                                  |
-| ----------- | -------------------------------- | ------------------------------------------ |
-| **Catalog** | `tenants`, `users`               | `catalog/sqlite.ts`, `catalog/postgres.ts` |
-| **Tenant**  | `events`, `findings`, `policies` | `tenant/sqlite.ts`, `tenant/postgres.ts`   |
+| Group       | Tables                                                                                                                                              | File pair                                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| **Catalog** | `tenants`, `users`                                                                                                                                  | `catalog/sqlite.ts`, `catalog/postgres.ts` |
+| **Tenant**  | `events`, `findings`, `policies`, `inventory`, `source_project`, `audit_events`, `classified_data`, `inspection_definitions`, `inspection_findings` | `tenant/sqlite.ts`, `tenant/postgres.ts`   |
 
 The catalog tables are cross-tenant metadata (no row-level security on either dialect). The tenant tables hold per-tenant operational data and are protected by RLS on Postgres.
 
@@ -221,6 +221,28 @@ The combined runtime objects `sqliteSchema` / `pgSchema` (exported from `@aka/sc
 | `events`   | Each captured prompt / response / code_change               |
 | `findings` | Each rule match on an event                                 |
 | `policies` | Per-tenant action overrides (allow / warn / redact / block) |
+
+#### Generalized data model (additive)
+
+A second set of tenant tables generalizes `events`/`findings`/rules into a
+star-shaped data model. They are **additive**: provisioned by the same
+migrations and populated by dedicated repositories in `@aka/persistence` (and the
+facade's `ensureInventory`), but the live capture path still writes
+`events`/`findings` — the writer cutover happens in a later phase.
+
+| Table                    | Role                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------ |
+| `inventory`              | Existence/dimension rows (`host`, `harness`, `user`), content-addressed and deduped  |
+| `source_project`         | The repository/project a session ran against, content-addressed by remote url        |
+| `audit_events`           | Timeline/fact rows forming a self-referential tree (`session → run → tool_call → …`) |
+| `classified_data`        | Small class dimension of recognized sensitive-data kinds (`aws_key`, `email_pii`, …) |
+| `inspection_definitions` | A detection rule version (id encodes the version, so a finding cites the exact rule) |
+| `inspection_findings`    | A hit of a definition against an audit event                                         |
+
+Inventory/source rows carry content-addressed, tenant-scoped ids
+(`sha256(tenant_id + …)`, computed in `@aka/persistence`) so repeat sessions
+upsert idempotently. Hot filter keys (`os_version`, `harness_version`) are SQLite
+generated columns over the JSON `attributes` bag, indexed for facets.
 
 ### Timestamp representation and the `time.ts` boundary
 
@@ -247,7 +269,7 @@ Zod(ISO) ← repo
 
 ### Row-level security (Postgres only)
 
-The tenant tables (`events`, `findings`, `policies`) declare `ENABLE ROW LEVEL SECURITY` and a single permissive policy keyed on `current_setting('app.tenant_id', true)` in the Postgres dialect. The SQLite tables have no RLS declarations (single-tenant local mode).
+Every tenant table (`events`, `findings`, `policies`, and the generalized data-model tables `inventory`, `source_project`, `audit_events`, `classified_data`, `inspection_definitions`, `inspection_findings`) declares `ENABLE ROW LEVEL SECURITY` and a single permissive policy keyed on `current_setting('app.tenant_id', true)` in the Postgres dialect. The SQLite tables have no RLS declarations (single-tenant local mode).
 
 The generated migration (`drizzle/postgres/0000_*.sql`) contains:
 
@@ -255,7 +277,7 @@ The generated migration (`drizzle/postgres/0000_*.sql`) contains:
 - `CREATE POLICY "events_tenant_isolation" ... USING ("tenant_id" = current_setting('app.tenant_id', true))`
 - (same for `findings` and `policies`)
 
-**FORCE ROW LEVEL SECURITY companion:** drizzle-kit 0.31 emits `ENABLE ROW LEVEL SECURITY` and `CREATE POLICY` but NOT `FORCE ROW LEVEL SECURITY`. Without FORCE, the table owner role bypasses RLS entirely. FORCE is added by a **journaled custom migration** `drizzle/postgres/0001_force_rls.sql`, created with `drizzle-kit generate --custom --name force_rls` so it is recorded in `meta/_journal.json` (idx 1) and applied by the standard drizzle-orm migrator after `0000_initial`. It is the only hand-written SQL in the project. (Note: a plain file sorted by name — e.g. a `9999_*.sql` — would NOT be applied, because the migrator reads the journal, not the directory listing.) When drizzle-kit gains native FORCE RLS support, this migration should be removed and `0000_initial` regenerated.
+**FORCE ROW LEVEL SECURITY companion:** drizzle-kit 0.31 emits `ENABLE ROW LEVEL SECURITY` and `CREATE POLICY` but NOT `FORCE ROW LEVEL SECURITY`. Without FORCE, the table owner role bypasses RLS entirely. FORCE is added by **journaled custom migrations** (e.g. `drizzle/postgres/0001_force_rls.sql`, and `0010_force_rls_meta_data_model.sql` for the generalized data-model tables), recorded in `meta/_journal.json` and applied by the standard drizzle-orm migrator after the table-creating migration they accompany. These are the only hand-written SQL files in the project. (Note: a plain file sorted by name — e.g. a `9999_*.sql` — would NOT be applied, because the migrator reads the journal, not the directory listing.) When drizzle-kit gains native FORCE RLS support, this migration should be removed and `0000_initial` regenerated.
 
 **Per-request tenant context.** `withTenantContext` opens a transaction and issues `set_config('app.tenant_id', $1, true)` (tenantId bound, never interpolated) so Postgres FORCE RLS resolves the active tenant; SQLite is a passthrough. Routes never call it directly. A **tenant-scope plugin** (`apps/backend/src/plugins/tenant-scope.ts`) decorates each request with `req.tenantScope` — an `open` `TenantScope` bound to that request's tenant — and repositories open their own context from it via `runInScope`. Isolation therefore lives in the data layer: a route cannot reach the database without RLS in force, because the only db-bearing value it can touch is the scope (typed `TenantScope | null`, narrowed by `requireTenantScope` which throws loudly rather than allow an un-scoped query). For work that must be atomic across several repository calls, `withTenantTransaction` opens one transaction and yields a `joined` scope shared by every call, so they commit or roll back together.
 
