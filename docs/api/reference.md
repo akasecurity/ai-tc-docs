@@ -457,6 +457,134 @@ curl -X POST http://localhost:4000/v1/policies \
 
 ---
 
+## GET /v1/policies/stats
+
+Returns aggregate counts for the built-in policy catalog. Requires an authenticated session.
+
+**Query params:** none
+
+**Response `200 OK`** — `PolicyStatsResponse`:
+
+```json
+{
+  "policies": 4,
+  "builtin": 4,
+  "custom": 0,
+  "detectionsGoverned": 2
+}
+```
+
+- `policies` = `builtin + custom` (always 4 in Milestone 1)
+- `builtin` = count of server-defined built-in policies (always 4)
+- `custom` = count of tenant-defined custom policies (always 0 in Milestone 1)
+- `detectionsGoverned` = count of installed packs with a non-null `policyId` (live DB value)
+
+**Errors:**
+
+| Status | `code`         | When                |
+| ------ | -------------- | ------------------- |
+| `401`  | `UNAUTHORIZED` | No valid auth token |
+
+> **Registration order (AC-8):** `/v1/policies/stats` is registered before `/v1/policies/:id`
+> in the route file so Fastify resolves `stats` as a static segment, not a slug parameter.
+
+**Example:**
+
+```bash
+curl http://localhost:4000/v1/policies/stats \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
+## GET /v1/policies
+
+Returns the built-in policy catalog for the authenticated tenant. Requires an authenticated session.
+
+**Query params:**
+
+| Param  | Type                    | Required | Default | Notes                        |
+| ------ | ----------------------- | -------- | ------- | ---------------------------- |
+| `kind` | `'builtin' \| 'custom'` | no       | —       | Omit to return all built-ins |
+
+**Response `200 OK`** — `ListPoliciesResponse` with `items: PolicyListItem[]`:
+
+```json
+{
+  "items": [
+    { "id": "monitor", "kind": "builtin", "name": "Monitor", "enabled": true, "usedByCount": 0 },
+    { "id": "warn", "kind": "builtin", "name": "Warn", "enabled": true, "usedByCount": 0 },
+    { "id": "redact", "kind": "builtin", "name": "Redact", "enabled": true, "usedByCount": 2 },
+    { "id": "block", "kind": "builtin", "name": "Block", "enabled": true, "usedByCount": 1 }
+  ]
+}
+```
+
+Items are always returned in the fixed order: `monitor → warn → redact → block`.
+`usedByCount` reflects the current count of installed packs assigned to each policy id.
+When `kind=custom`, returns `{ "items": [] }` (custom policies are deferred to a future milestone).
+
+**Errors:**
+
+| Status | `code`             | When                                |
+| ------ | ------------------ | ----------------------------------- |
+| `400`  | `VALIDATION_ERROR` | `kind` is not `builtin` or `custom` |
+| `401`  | `UNAUTHORIZED`     | No valid auth token                 |
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/policies?kind=builtin" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
+## GET /v1/policies/:id
+
+Returns the full detail for a single built-in policy. Requires an authenticated session.
+
+**Path params:**
+
+| Param | Description                                                   |
+| ----- | ------------------------------------------------------------- |
+| `id`  | Built-in policy slug: `monitor`, `warn`, `redact`, or `block` |
+
+**Response `200 OK`** — `PolicyDetail`:
+
+```json
+{
+  "specVersion": 1,
+  "id": "redact",
+  "kind": "builtin",
+  "name": "Redact",
+  "enabled": true,
+  "description": "Automatically strip the matched value from the request, then continue.",
+  "usedBy": [
+    { "id": "aka/us-ssn", "name": "US Social Security numbers", "ruleCount": 1, "enabled": true }
+  ]
+}
+```
+
+`usedBy` contains all installed packs in the tenant that have been assigned this `policyId`.
+Each `UsedByItem` has `id` (`${namespace}/${packId}`), `name`, `ruleCount`, and `enabled`.
+
+**Errors:**
+
+| Status | `code`             | Convention  | When                                    |
+| ------ | ------------------ | ----------- | --------------------------------------- |
+| `401`  | `UNAUTHORIZED`     | UPPER_SNAKE | No valid auth token                     |
+| `404`  | `policy_not_found` | lower_snake | `id` is not one of the 4 built-in slugs |
+
+**Example:**
+
+```bash
+curl http://localhost:4000/v1/policies/redact \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
 ## POST /v1/rules/test
 
 Runs **draft** detection rules through the engine against ad-hoc text and/or
@@ -860,7 +988,8 @@ Both are wrapped in the same envelope: `{ "error": { "code": "...", "message": "
 
 ## PATCH /v1/installed-packs/:namespace/:packId
 
-Toggle the `enabled` flag on an installed detection pack. Requires an authenticated session.
+Partially updates an installed detection pack. Supports toggling `enabled` and/or assigning a
+`policyId`. Requires an authenticated session.
 
 **Path params:**
 
@@ -869,13 +998,23 @@ Toggle the `enabled` flag on an installed detection pack. Requires an authentica
 | `namespace` | Pack publisher namespace (e.g. `aka`)  |
 | `packId`    | Pack identifier (e.g. `cloud-secrets`) |
 
-**Request body:**
+**Request body** (`PatchInstalledPackRequest`) — at least one field must be present:
+
+| Field      | Type             | Required | Notes                                                                           |
+| ---------- | ---------------- | -------- | ------------------------------------------------------------------------------- |
+| `enabled`  | `boolean`        | no       | Toggle pack on/off                                                              |
+| `policyId` | `string \| null` | no       | Assign a built-in policy (`monitor\|warn\|redact\|block`) or `null` to unassign |
+
+An empty body `{}` returns `400 VALIDATION_ERROR`.
+
+**Examples:**
 
 ```json
-{ "enabled": true }
+{ "enabled": false }
+{ "policyId": "redact" }
+{ "policyId": null }
+{ "enabled": false, "policyId": "block" }
 ```
-
-At least one field must be present — an empty body `{}` returns `400 VALIDATION_ERROR`.
 
 **Response `200 OK`** — the updated `InstalledPack` resource:
 
@@ -887,19 +1026,29 @@ At least one field must be present — an empty body `{}` returns `400 VALIDATIO
   "packId": "cloud-secrets",
   "version": "2.3.1",
   "name": "Cloud Credentials",
-  "enabled": true
+  "enabled": true,
+  "policyId": "redact"
 }
 ```
+
+`policyId` is absent when the field is null/unassigned (nullable-optional pattern).
 
 **Errors:**
 
 | Status | `code`                     | Convention  | When                                             |
 | ------ | -------------------------- | ----------- | ------------------------------------------------ |
 | `400`  | `VALIDATION_ERROR`         | UPPER_SNAKE | Body is empty or does not match the schema (Zod) |
+| `400`  | `unknown_policy`           | lower_snake | `policyId` is not one of the 4 built-in slugs    |
 | `401`  | `UNAUTHORIZED`             | UPPER_SNAKE | No valid auth token                              |
 | `404`  | `installed_pack_not_found` | lower_snake | No installed pack with that namespace/packId     |
 
 > **Permission note:** this endpoint does NOT currently return `403 Forbidden`. The codebase has no read/write permission layer — all authenticated tenant users are full-access. Do not build frontend logic against a `403` response; it will not fire.
+
+> **Half-state note (Milestone 1):** `policyId` is recorded in the database and surfaced in
+> the API, but the enforcement engine currently uses category-based policies
+> (`mergePolicyBundle`/`resolveAction`) — not `policyId`. Assigning `block` to a `pii`-category
+> pack shows `block` in the UI, but the engine still executes `redact`. A future milestone
+> will rewire enforcement to honour `policyId`.
 
 **Example:**
 
@@ -907,7 +1056,7 @@ At least one field must be present — an empty body `{}` returns `400 VALIDATIO
 curl -X PATCH "http://localhost:4000/v1/installed-packs/aka/cloud-secrets" \
   -H "Authorization: Bearer mytoken1234567890" \
   -H "Content-Type: application/json" \
-  -d '{"enabled": false}'
+  -d '{"policyId": "block"}'
 ```
 
 ---
@@ -1224,13 +1373,343 @@ curl -X POST "http://localhost:4000/v1/detections/aka%2Fcloud-secrets/update" \
 
 ---
 
+## GET /v1/findings/stats
+
+Returns unfiltered totals for the authenticated tenant's findings — drives the navigation badge count.
+
+**operationId:** `getFindingStats`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**Response `200 OK`:**
+
+```json
+{
+  "findings": 131,
+  "groups": 22,
+  "bySeverity": { "critical": 4, "high": 9, "medium": 6, "low": 3 }
+}
+```
+
+`findings` = total instance count; `groups` = distinct rule groups; `bySeverity` counts groups (not instances).
+
+> **Note:** counts are computed in-memory over the most recent findings and are
+> approximate for very large tenants (currently capped at ~2000 findings). Exact
+> totals land with the planned SQL aggregation (`COUNT … GROUP BY`). Treat the
+> badge as indicative, not authoritative, at high volume.
+
+**Errors:**
+
+| Status | `code`         | When                |
+| ------ | -------------- | ------------------- |
+| `401`  | `UNAUTHORIZED` | No valid auth token |
+
+> **Permission note:** read endpoints are open to all authenticated tenant users; there is no read-side permission split.
+
+---
+
+## GET /v1/findings/flat
+
+Returns a flat, paginated list of individual finding instances — the feed consumed by the plugin and CLI. The dashboard uses the grouped `GET /v1/findings` instead.
+
+**operationId:** `listFindingsFlat`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**IMPORTANT:** registered **before** `GET /v1/findings/:groupId` — `flat` is a static segment and is never captured as a `:groupId` param.
+
+**Query parameters:**
+
+| Parameter  | Type          | Default | Description                                   |
+| ---------- | ------------- | ------- | --------------------------------------------- |
+| `limit`    | integer 1–200 | `50`    | Page size                                     |
+| `cursor`   | string        | —       | Opaque pagination cursor from `nextCursor`    |
+| `severity` | string        | —       | Filter by severity (`critical`, `high`, etc.) |
+| `category` | string        | —       | Filter by detection category                  |
+| `eventId`  | UUID          | —       | Filter to findings for a specific event       |
+
+**Response `200 OK`** — flat `ListFindingsResponse`:
+
+```json
+{
+  "items": [
+    {
+      "id": "10000000-0000-0000-0000-000000000001",
+      "tenantId": "t1",
+      "eventId": "e0000000-0000-0000-0000-000000000001",
+      "ruleId": "aka/aws-key",
+      "category": "secret",
+      "severity": "high",
+      "span": { "start": 12, "end": 42 },
+      "maskedMatch": "AKIA••••••••7Q4F",
+      "actionTaken": "block",
+      "confidence": 0.95
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Each item is a raw `Finding` (flat, per-instance). `nextCursor` is `null` when no further pages exist.
+
+**Errors:**
+
+| Status | `code`             | When                                        |
+| ------ | ------------------ | ------------------------------------------- |
+| `400`  | `VALIDATION_ERROR` | Invalid query param (e.g. non-UUID eventId) |
+| `401`  | `UNAUTHORIZED`     | No valid auth token                         |
+
+---
+
+## GET /v1/findings
+
+Returns paginated, filterable, searchable finding groups with embedded instances and per-filter facet counts. Used by the dashboard.
+
+> The plugin and CLI use `GET /v1/findings/flat` (see above) which returns the flat `ListFindingsResponse` shape expected by `@aka/client`'s `listFindings()` wrapper.
+
+**operationId:** `listFindings`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**Query parameters:**
+
+| Parameter  | Type                | Default | Description                                                                             |
+| ---------- | ------------------- | ------- | --------------------------------------------------------------------------------------- |
+| `severity` | `Severity[]`        | —       | Filter by group severity (repeatable: `?severity=high&severity=critical`)               |
+| `provider` | `FindingProvider[]` | —       | Filter to groups with any matching provider (repeatable)                                |
+| `action`   | `FindingAction[]`   | —       | Filter to groups with any matching action (repeatable)                                  |
+| `subtype`  | `string[]`          | —       | Filter by group subtype (repeatable)                                                    |
+| `q`        | string              | —       | Case-insensitive search over `subtype`, `category`, `maskedValue`, `repo`, `file`, `id` |
+| `groupBy`  | `'type'`            | `type`  | Only `type` is supported currently                                                      |
+| `limit`    | integer 1–100       | `50`    | Page size (groups)                                                                      |
+| `cursor`   | string              | —       | Opaque pagination cursor from `nextCursor`                                              |
+
+**Sorting:** severity desc (critical > high > medium > low), then `latestDetectedAt` desc.
+
+**Facet semantics:** each dimension computed excluding its own filter.
+
+**Response `200 OK`:**
+
+```json
+{
+  "totals": { "findings": 22, "groups": 5 },
+  "facets": {
+    "severity": [{ "value": "high", "count": 3 }],
+    "provider": [{ "value": "claudecode", "count": 4 }],
+    "action": [{ "value": "blocked", "count": 2 }],
+    "subtype": [{ "value": "aka/aws-key", "count": 1 }]
+  },
+  "items": [
+    {
+      "id": "aka/aws-key",
+      "category": "secret",
+      "subtype": "aka/aws-key",
+      "severity": "high",
+      "match": { "maskedValue": "AKIA••••••••7Q4F", "contextPrefix": "" },
+      "detection": { "id": "aka/aws-key", "name": "Cloud Credentials" },
+      "policy": { "id": "category:secret", "name": "secret" },
+      "instanceCount": 3,
+      "providers": ["claudecode", "cursor"],
+      "aggregateAction": "blocked",
+      "latestDetectedAt": "2026-06-22T10:00:00.000Z",
+      "instances": [
+        {
+          "id": "20000000-0000-0000-0000-000000000001",
+          "provider": "claudecode",
+          "repo": "payments-api",
+          "file": "src/index.ts",
+          "action": "blocked",
+          "detectedAt": "2026-06-20T10:00:00.000Z",
+          "confidence": 0.95
+        }
+      ]
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+`aggregateAction` is `null` when instances have differing actions (Mixed). `instances` are ordered newest-first.
+
+**Errors:**
+
+| Status | `code`             | When                                                |
+| ------ | ------------------ | --------------------------------------------------- |
+| `400`  | `VALIDATION_ERROR` | Invalid query params (limit out of range, bad enum) |
+| `401`  | `UNAUTHORIZED`     | No valid auth token                                 |
+
+---
+
+## GET /v1/findings/:groupId
+
+Returns the single group object with the **complete** (uncapped) instance list.
+
+**operationId:** `getFinding`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**Path params:**
+
+| Param      | Description                    |
+| ---------- | ------------------------------ |
+| `:groupId` | Rule ID (e.g. `aka%2Faws-key`) |
+
+**Response `200 OK`** — same shape as an item from `GET /v1/findings` with the full instances array.
+
+**Errors:**
+
+| Status | `code`              | When                                                    |
+| ------ | ------------------- | ------------------------------------------------------- |
+| `401`  | `UNAUTHORIZED`      | No valid auth token                                     |
+| `404`  | `finding_not_found` | Unknown groupId, or groupId belonging to another tenant |
+
+> **Permission note:** wrong-tenant groupId returns `404` (not `403`) — existence must not leak.
+
+---
+
+## GET /v1/findings/instances/:instanceId
+
+Returns a denormalized instance detail combining `FindingInstance` fields with group-level context.
+
+**operationId:** `getFindingInstance`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**IMPORTANT:** registered **before** `GET /v1/findings/:groupId` — `instances` is a static segment.
+
+**Path params:**
+
+| Param         | Description      |
+| ------------- | ---------------- |
+| `:instanceId` | Finding row UUID |
+
+**Response `200 OK`:**
+
+```json
+{
+  "id": "20000000-0000-0000-0000-000000000001",
+  "provider": "claudecode",
+  "repo": "payments-api",
+  "file": "src/index.ts",
+  "action": "blocked",
+  "detectedAt": "2026-06-20T10:00:00.000Z",
+  "confidence": 0.95,
+  "groupId": "aka/aws-key",
+  "category": "secret",
+  "subtype": "aka/aws-key",
+  "severity": "high",
+  "match": { "maskedValue": "AKIA••••••••7Q4F", "contextPrefix": "" },
+  "detection": { "id": "aka/aws-key", "name": "Cloud Credentials" },
+  "policy": { "id": "category:secret", "name": "secret" }
+}
+```
+
+**Errors:**
+
+| Status | `code`               | When                |
+| ------ | -------------------- | ------------------- |
+| `401`  | `UNAUTHORIZED`       | No valid auth token |
+| `404`  | `instance_not_found` | Unknown instanceId  |
+
+---
+
+## POST /v1/findings/:groupId/action
+
+Writes a `finding_action_overrides` record (upsert) and returns the updated group.
+
+**operationId:** `applyFindingAction`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**Path params:**
+
+| Param      | Description          |
+| ---------- | -------------------- |
+| `:groupId` | Rule ID / group slug |
+
+**Request body:**
+
+```json
+{ "action": "allowed", "instanceId": "20000000-0000-0000-0000-000000000001" }
+```
+
+| Field        | Type            | Required | Notes                                                    |
+| ------------ | --------------- | -------- | -------------------------------------------------------- |
+| `action`     | `FindingAction` | Yes      | New enforcement decision (excludes `quarantined`)        |
+| `instanceId` | string          | No       | When omitted, applies override to all instances in group |
+
+`quarantined` is system-assigned and is excluded from the request contract, so
+sending it fails request validation → `400 VALIDATION_ERROR` (like any other
+invalid `action` value).
+
+**Response `200 OK`** — updated group (same shape as `GET /v1/findings/:groupId`).
+
+**Errors:**
+
+| Status | `code`               | When                                                             |
+| ------ | -------------------- | ---------------------------------------------------------------- |
+| `400`  | `VALIDATION_ERROR`   | Invalid `action` value (including system-assigned `quarantined`) |
+| `401`  | `UNAUTHORIZED`       | No valid auth token                                              |
+| `403`  | `forbidden`          | Caller has a read-only role (`security_viewer`)                  |
+| `404`  | `finding_not_found`  | Unknown groupId, or group has no instances                       |
+| `404`  | `instance_not_found` | `instanceId` not found or does not belong to groupId             |
+
+> **Permission note:** applying an override requires a writable role. Users with
+> the read-only `security_viewer` role get `403 forbidden`; `owner`, `admin`, and
+> `member` can apply overrides. Read endpoints remain open to all authenticated
+> tenant users.
+
+---
+
+## GET /v1/findings/export
+
+Downloads the complete filtered finding set as a file. Pagination params (`limit`, `cursor`) are ignored.
+
+**operationId:** `exportFindings`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**IMPORTANT:** registered **before** `GET /v1/findings/:groupId` — `export` is a static segment.
+
+**Query parameters:** same filter params as `GET /v1/findings` (minus `limit`/`cursor`/`groupBy`) plus:
+
+| Parameter | Type              | Default | Notes           |
+| --------- | ----------------- | ------- | --------------- |
+| `format`  | `'csv' \| 'json'` | `csv`   | Download format |
+
+**Response headers:**
+
+- `Content-Type: text/csv` (or `application/json`)
+- `Content-Disposition: attachment; filename="findings.csv"` (or `.json`)
+
+**CSV columns (normative order):** `instanceId, groupId, category, subtype, severity, provider, repo, file, action, detectedAt, confidence, policy`
+
+**Never included:** unmasked match values.
+
+**Errors:**
+
+| Status | `code`             | When                          |
+| ------ | ------------------ | ----------------------------- |
+| `400`  | `VALIDATION_ERROR` | `format=xml` or other invalid |
+| `401`  | `UNAUTHORIZED`     | No valid auth token           |
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/findings/export?format=csv" \
+  -H "Authorization: Bearer mytoken1234567890" \
+  -o findings.csv
+```
+
+---
+
+## Route registration order (findings)
+
+The 6 findings routes are registered in this order to prevent parametric routes shadowing static segments:
+
+1. `GET  /v1/findings/stats`
+2. `GET  /v1/findings/export`
+3. `GET  /v1/findings/instances/:instanceId`
+4. `GET  /v1/findings`
+5. `GET  /v1/findings/:groupId`
+6. `POST /v1/findings/:groupId/action`
+
+Fastify's find-my-way radix router prioritises static segments over parametric regardless of order — ordering is for readability and defensive correctness.
+
+---
+
 ## Planned endpoints
 
 These endpoints are defined in `packages/schema/src/zod/api.ts` but not yet implemented:
 
-| Method | Path           | Description                          |
-| ------ | -------------- | ------------------------------------ |
-| `GET`  | `/v1/findings` | List detection findings with filters |
-| `PUT`  | `/v1/policies` | Update policy bundle                 |
+| Method | Path           | Description          |
+| ------ | -------------- | -------------------- |
+| `PUT`  | `/v1/policies` | Update policy bundle |
 
 Track progress in the GitHub issues.
