@@ -44,11 +44,12 @@ Every hook invocation is a **fresh, short-lived process**: Claude Code pipes a J
 
 Declared in `hooks/hooks.json` (note: `timeout` is in **seconds**, and commands use `${CLAUDE_PLUGIN_ROOT}` because hooks run with the user's project as cwd):
 
-| Hook               | Matcher                | What AKA does                                                         |
-| ------------------ | ---------------------- | --------------------------------------------------------------------- |
-| `UserPromptSubmit` | all prompts            | block or warn (Claude Code cannot rewrite prompt text — no redaction) |
-| `PreToolUse`       | `Bash\|Edit\|Write`    | deny, **redact via `updatedInput`**, or warn                          |
-| `PostToolUse`      | `Bash\|Read\|WebFetch` | replace sensitive output via `updatedToolOutput`, or warn             |
+| Hook               | Matcher                | What AKA does                                                                                                                                         |
+| ------------------ | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SessionStart`     | all sessions           | resolve this machine's inventory (host/harness/account/project), upsert it, and open the session's audit-event root (once per session; emits nothing) |
+| `UserPromptSubmit` | all prompts            | block or warn (Claude Code cannot rewrite prompt text — no redaction)                                                                                 |
+| `PreToolUse`       | `Bash\|Edit\|Write`    | deny, **redact via `updatedInput`**, or warn                                                                                                          |
+| `PostToolUse`      | `Bash\|Read\|WebFetch` | replace sensitive output via `updatedToolOutput`, or warn                                                                                             |
 
 ## Hook output contract (Claude Code's, not ours)
 
