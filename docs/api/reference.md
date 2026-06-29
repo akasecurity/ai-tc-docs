@@ -303,6 +303,84 @@ curl "http://localhost:4000/v1/events?limit=10" \
 
 ---
 
+## POST /v1/inventory
+
+Idempotent upsert of a session's **inventory dimensions** (the [Meta] Data Model). The body is an `InventoryContext` — the machine/repo facts the plugin resolves (`host`, `harness`, `project`). The **account** (User/Account) dimension is _not_ accepted from the client; it is derived server-side from the authenticated user. Content-addressed, tenant-scoped ids are computed server-side and returned, so repeat sessions on the same machine/project collapse to one row each.
+
+**Request body** (all members optional):
+
+```json
+{
+  "host": {
+    "objectType": "host",
+    "identityKey": "stable-machine-id",
+    "title": "my-laptop",
+    "attributes": {
+      "host_name": "my-laptop",
+      "os": "darwin",
+      "os_version": "25.5.0",
+      "arch": "arm64"
+    }
+  },
+  "harness": {
+    "objectType": "harness",
+    "identityKey": "claude-code",
+    "title": "Claude Code",
+    "attributes": { "harness_version": "1.2.3", "interface": "cli" }
+  },
+  "project": { "url": "git@github.com:org/repo.git", "name": "repo", "attributes": {} }
+}
+```
+
+Only the `identityKey` (per `objectType`) is hashed into the content-addressed id; everything else rides in the mutable `attributes` bag (Type-1 / overwrite-to-latest, with `first_seen` pinned).
+
+**Response `200 OK`** — the resolved ids, ready to stamp onto a Session audit row:
+
+```json
+{ "hostId": "…", "harnessId": "…", "accountId": "…", "sourceProjectId": "…" }
+```
+
+---
+
+## POST /v1/audit-events
+
+Append one **audit-event fact** — e.g. the Session root opened at `SessionStart`. Idempotent on the event `id` (re-sending the same id is a no-op). The `user_id` is server-derived from auth; the inventory FKs (`hostId`/`harnessId`/`sourceProjectId`) are the ids returned by `POST /v1/inventory`.
+
+**Request body:**
+
+```json
+{
+  "id": "claude-session-id",
+  "eventType": "session",
+  "startedAt": "2026-06-26T20:00:00Z",
+  "hostId": "…",
+  "harnessId": "…",
+  "sourceProjectId": "…",
+  "attributes": { "os_version": "25.5.0", "harness_version": "1.2.3" }
+}
+```
+
+**Response `200 OK`:** `{ "accepted": true }`
+
+---
+
+## GET /v1/facets
+
+Distinct filter-facet values for the authenticated tenant, read from the small inventory dimension (never by scanning the audit fact table). Powers the host/harness/project/os filters on the dashboard read surfaces.
+
+**Response `200 OK`:**
+
+```json
+{
+  "hosts": ["my-laptop"],
+  "harnesses": ["Claude Code"],
+  "osVersions": ["25.5.0"],
+  "projects": ["repo"]
+}
+```
+
+---
+
 ## GET /v1/policy-bundle
 
 Returns the policy bundle for the authenticated tenant. The Claude Code plugin caches this bundle and uses it for in-process policy resolution.
