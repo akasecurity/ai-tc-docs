@@ -22,7 +22,7 @@ Every service emits **OTLP** to an **OpenTelemetry Collector**. The collector is
 - **HTTP, Fastify, and Postgres** via OpenTelemetry auto-instrumentation.
 - **Database queries** (both SQLite and Postgres) via an explicit `db.query` span + duration metric at the single tenant-scope chokepoint every repository call flows through — SQLite has no auto-instrumentation, so this is its only DB visibility.
 - **Auth** — `verifyApiKey`, `getSession`, and tenant resolution each get a span.
-- **Outgoing calls** — `@aka/client` injects W3C `traceparent`/`tracestate`/`baggage` and a correlation id on every backend→registry and plugin→backend request, so a trace spans the whole chain.
+- **Outgoing calls** — `@alsoknownassecurity/client` injects W3C `traceparent`/`tracestate`/`baggage` and a correlation id on every backend→registry and plugin→backend request, so a trace spans the whole chain.
 
 ## Correlation id & log correlation
 

@@ -27,7 +27,7 @@ pnpm setup   # pnpm install + lefthook hooks
       STORAGE_DRIVER=sqlite \
       AKA_LOCAL_TOKEN=mytoken1234567890 \
       MIGRATE_ON_START=true \
-      pnpm --filter @aka/backend dev
+      pnpm --filter @alsoknownassecurity/backend dev
     ```
 
     The server starts on **port 4000**.

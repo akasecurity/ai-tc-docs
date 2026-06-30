@@ -44,7 +44,7 @@ as a separate **owner-DSN** step:
 
 ```bash
 ADMIN_DATABASE_URL=postgresql://aka:akadev@localhost:5432/aka \
-  pnpm --filter @aka/backend migrate:pg
+  pnpm --filter @alsoknownassecurity/backend migrate:pg
 ```
 
 Re-running is safe — the migrator skips already-applied migrations.
@@ -58,7 +58,7 @@ MODE=dev \
   ADMIN_DATABASE_URL=postgresql://aka:akadev@localhost:5432/aka \
   BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
   BETTER_AUTH_URL=http://localhost:4000 \
-  pnpm --filter @aka/backend dev
+  pnpm --filter @alsoknownassecurity/backend dev
 ```
 
 Notes:
@@ -86,7 +86,7 @@ Notes:
 ## 4. Start the dashboard
 
 ```bash
-pnpm --filter @aka/dashboard dev
+pnpm --filter @alsoknownassecurity/dashboard dev
 ```
 
 Navigate to `http://localhost:5173`. The Vite dev server proxies `/v1`,

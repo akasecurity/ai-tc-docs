@@ -35,19 +35,19 @@ ai-control-plane/
 
 ## Package dependency rules
 
-AKA enforces strict import boundaries via `eslint-plugin-boundaries`. Violating them is a CI failure.
+AKA enforces strict import boundaries via the pnpm workspace graph + `tsc` (a forbidden import does not resolve / fails typecheck) and a dedicated CI gate (`pnpm check:boundaries`), not a lint plugin. Violating them is a CI failure.
 
 ```
-apps/backend/routes       →  @aka/schema (Zod only), services/
+apps/backend/routes       →  @alsoknownassecurity/schema (Zod only), services/
 apps/backend/services     →  repositories/
-apps/backend/repositories →  @aka/schema/drizzle/*, drizzle-orm
-apps/plugin-*             →  @aka/plugin-sdk, @aka/plugin-runtime
-@aka/plugin-runtime       →  @aka/plugin-sdk, @aka/persistence, @aka/client, @aka/schema
-@aka/plugin-sdk           →  @aka/detections, @aka/client, @aka/persistence, @aka/schema
-@aka/persistence          →  node:sqlite, @aka/schema (no Drizzle, no @aka/detections)
-@aka/client               →  fetch (only package allowed to call fetch)
-@aka/config               →  process.env (only package allowed to read env)
-@aka/detections           →  @aka/schema (no I/O, no Node-API deps)
+apps/backend/repositories →  @alsoknownassecurity/schema/drizzle/*, drizzle-orm
+apps/plugin-*             →  @alsoknownassecurity/plugin-sdk, @alsoknownassecurity/plugin-runtime
+@alsoknownassecurity/plugin-runtime       →  @alsoknownassecurity/plugin-sdk, @alsoknownassecurity/persistence, @alsoknownassecurity/client, @alsoknownassecurity/schema
+@alsoknownassecurity/plugin-sdk           →  @alsoknownassecurity/detections, @alsoknownassecurity/client, @alsoknownassecurity/persistence, @alsoknownassecurity/schema
+@alsoknownassecurity/persistence          →  node:sqlite, @alsoknownassecurity/schema (no Drizzle, no @alsoknownassecurity/detections)
+@alsoknownassecurity/client               →  fetch (only package allowed to call fetch)
+@alsoknownassecurity/config               →  process.env (only package allowed to read env)
+@alsoknownassecurity/detections           →  @alsoknownassecurity/schema (no I/O, no Node-API deps)
 ```
 
 Three cross-cutting rules every contributor must remember:
@@ -59,22 +59,22 @@ Three cross-cutting rules every contributor must remember:
 ## Local-first plugin & optional backend (Phase 1)
 
 The plugin is fully useful with **zero backend and zero Docker**. The runtime
-depends on a single **`DataGateway`** port (defined in `@aka/plugin-sdk`);
-`@aka/plugin-runtime` resolves the implementation from the run mode:
+depends on a single **`DataGateway`** port (defined in `@alsoknownassecurity/plugin-sdk`);
+`@alsoknownassecurity/plugin-runtime` resolves the implementation from the run mode:
 
 - **standalone** (default) → a SQLite store at `~/.aka/data/aka.db` via
-  `@aka/persistence` — the always-present writer of `events` and `findings`.
-- **attached** → the (local) backend's HTTP API via `@aka/client`; the plugin
+  `@alsoknownassecurity/persistence` — the always-present writer of `events` and `findings`.
+- **attached** → the (local) backend's HTTP API via `@alsoknownassecurity/client`; the plugin
   also pulls the org's centrally-managed ruleset into a cache and detects with it.
 
 Detection runs in-process in either mode, and results surface through slash
 commands (`/aka:health`, `/aka:findings`, `/aka:recommend`, `/aka:audit`). The
-gateway and the shared data shapes live in `@aka/plugin-sdk` / `@aka/persistence`,
+gateway and the shared data shapes live in `@alsoknownassecurity/plugin-sdk` / `@alsoknownassecurity/persistence`,
 so a new plugin (Claude Code first, VSCode/Cursor later) adds only a thin
 tool-specific adapter, never a copy of the storage/detection logic.
 
 ```
- Claude Code ──hooks──▶ AKA plugin (adapter) ──▶ @aka/plugin-sdk
+ Claude Code ──hooks──▶ AKA plugin (adapter) ──▶ @alsoknownassecurity/plugin-sdk
                                                       │ writes
                                                       ▼
         ~/.aka/data/aka.db   (events · findings · policies)   ◀── shared by all plugins
@@ -122,7 +122,7 @@ machine.
                     │
                     ▼ HTTP POST /v1/events
 ┌────────────────────────────────────────────┐
-│  @aka/backend                               │
+│  @alsoknownassecurity/backend                               │
 │                                             │
 │  Route: validate IngestRequest (Zod)        │
 │  Service: ingestEvents()                    │
@@ -151,10 +151,10 @@ The dashboard is a React SPA that calls the backend's REST API via TanStack Quer
 
 ## API client generation
 
-`@aka/client` is **generated**, not hand-maintained. The contract flows one way:
+`@alsoknownassecurity/client` is **generated**, not hand-maintained. The contract flows one way:
 
 ```
-@aka/schema (Zod)  →  Fastify OpenAPI spec  →  @aka/client (Hey API)
+@alsoknownassecurity/schema (Zod)  →  Fastify OpenAPI spec  →  @alsoknownassecurity/client (Hey API)
   single source        GET /openapi.json         typed SDK + TanStack Query
    of truth          (backend + registry)        options, sole fetch caller
 ```
@@ -166,10 +166,10 @@ generates `packages/client/src/generated/**` — **types only**, no runtime
 validation, since the server already validates and the types derive from the same
 Zod contracts. A thin hand-written wrapper (`src/index.ts`) keeps the stable public
 surface (`createClient` / `createRegistryClient` / `RegistryRequestError`, typed
-with `@aka/schema`) and owns what codegen can't: the dual `x-api-key` + `Bearer`
+with `@alsoknownassecurity/schema`) and owns what codegen can't: the dual `x-api-key` + `Bearer`
 auth headers and per-instance `baseUrl`/`token`.
 
-Specs and generated output are committed; `pnpm --filter @aka/client gen:openapi:check`
+Specs and generated output are committed; `pnpm --filter @alsoknownassecurity/client gen:openapi:check`
 regenerates and fails on drift (run in CI). Generated files are `@ts-nocheck`,
 ESLint-ignored, and Prettier-ignored — type-safety is enforced at the wrapper
 boundary and each call site.
@@ -212,7 +212,7 @@ The Drizzle schema lives in `packages/schema/src/drizzle/` and is split into two
 
 The catalog tables are cross-tenant metadata (no row-level security on either dialect). The tenant tables hold per-tenant operational data and are protected by RLS on Postgres.
 
-The combined runtime objects `sqliteSchema` / `pgSchema` (exported from `@aka/schema/drizzle`) spread both groups together and are used as the drizzle client's `{ schema }` argument.
+The combined runtime objects `sqliteSchema` / `pgSchema` (exported from `@alsoknownassecurity/schema/drizzle`) spread both groups together and are used as the drizzle client's `{ schema }` argument.
 
 | Table      | Purpose                                                     |
 | ---------- | ----------------------------------------------------------- |
@@ -226,7 +226,7 @@ The combined runtime objects `sqliteSchema` / `pgSchema` (exported from `@aka/sc
 
 A second set of tenant tables generalizes `events`/`findings`/rules into a
 star-shaped data model. They are **additive**: provisioned by the same
-migrations and populated by dedicated repositories in `@aka/persistence` (and the
+migrations and populated by dedicated repositories in `@alsoknownassecurity/persistence` (and the
 facade's `ensureInventory`), but the live capture path still writes
 `events`/`findings` — the writer cutover happens in a later phase.
 
@@ -240,7 +240,7 @@ facade's `ensureInventory`), but the live capture path still writes
 | `inspection_findings`    | A hit of a definition against an audit event                                         |
 
 Inventory/source rows carry content-addressed, tenant-scoped ids
-(`sha256(tenant_id + …)`, computed in `@aka/persistence`) so repeat sessions
+(`sha256(tenant_id + …)`, computed in `@alsoknownassecurity/persistence`) so repeat sessions
 upsert idempotently. Hot filter keys (`os_version`, `harness_version`) are SQLite
 generated columns over the JSON `attributes` bag, indexed for facets.
 
@@ -290,14 +290,14 @@ The current auth hook is a single-user bearer token stub. Real multi-tenancy (Be
 The system is instrumented with OpenTelemetry for distributed tracing, metrics, and trace-correlated logs, following CNCF conventions. It is **off by default and zero-cost when disabled** (`OTEL_ENABLED=false`): the SDK is loaded via a `node --import` preload that returns before importing any `@opentelemetry/*` code unless enabled, and hot-path code (the DB span wrapper, outgoing header injection) short-circuits on a boolean.
 
 - **Collector-centric.** Apps only ever emit OTLP to an OpenTelemetry Collector, which fans out to Jaeger (traces) + Prometheus (metrics) by default, or to AWS CloudWatch/X-Ray or Azure Monitor by collector config alone — vendor choice never touches app code.
-- **Coverage.** HTTP/Fastify/Postgres via auto-instrumentation; an explicit `db.query` span + metric at the `runInScope` chokepoint covers SQLite (no auto-instrumentation) and Postgres; auth lookups get spans. `@aka/client` injects W3C `traceparent` + a correlation id on every outgoing call, so plugin→backend→DB→registry is one trace.
+- **Coverage.** HTTP/Fastify/Postgres via auto-instrumentation; an explicit `db.query` span + metric at the `runInScope` chokepoint covers SQLite (no auto-instrumentation) and Postgres; auth lookups get spans. `@alsoknownassecurity/client` injects W3C `traceparent` + a correlation id on every outgoing call, so plugin→backend→DB→registry is one trace.
 - **Correlation.** Every request reuses/echoes `x-request-id` (the trace id when present) and every log line carries `trace_id`/`span_id`.
 - **Probes.** `/healthz/live` is a dependency-free liveness check; `/healthz/ready` is dependency-aware readiness (`503` when the DB ping fails). Both are always available regardless of `OTEL_ENABLED`.
 
-Implementation lives in `@aka/telemetry` (shared SDK bootstrap) with per-service `--import` preloads; the runtime keeps `@opentelemetry/*` external because its instrumentation uses dynamic `require()`s a bundle cannot express. See [Observability](../operations/observability.md).
+Implementation lives in `@alsoknownassecurity/telemetry` (shared SDK bootstrap) with per-service `--import` preloads; the runtime keeps `@opentelemetry/*` external because its instrumentation uses dynamic `require()`s a bundle cannot express. See [Observability](../operations/observability.md).
 
 ## Follow-ups (known gaps)
 
-**Dialect-explicit schema type aliases:** the former `CatalogSchema`/`TenantSchema` aliases were SQLite-typed only, so a Postgres handle had no type to describe it. They are replaced by dialect-explicit aliases in `@aka/schema/drizzle`: `SqliteSchema`/`PgSchema` (the full combined handles) and the logical seams `SqliteCatalogSchema`, `SqliteTenantSchema`, `PgCatalogSchema`, `PgTenantSchema`. Each is derived with `Pick<...>` over the runtime `sqliteSchema`/`pgSchema` objects, so the types cannot drift from what `drizzle()` actually receives — a misspelled or removed table is a compile error, and new tables are tracked automatically. The dialect is part of the name because a Postgres table is not assignable to a SQLite one. Locked by type-level assertions in `packages/schema/src/drizzle/schema-types.test.ts` (enforced by `tsc --noEmit`).
+**Dialect-explicit schema type aliases:** the former `CatalogSchema`/`TenantSchema` aliases were SQLite-typed only, so a Postgres handle had no type to describe it. They are replaced by dialect-explicit aliases in `@alsoknownassecurity/schema/drizzle`: `SqliteSchema`/`PgSchema` (the full combined handles) and the logical seams `SqliteCatalogSchema`, `SqliteTenantSchema`, `PgCatalogSchema`, `PgTenantSchema`. Each is derived with `Pick<...>` over the runtime `sqliteSchema`/`pgSchema` objects, so the types cannot drift from what `drizzle()` actually receives — a misspelled or removed table is a compile error, and new tables are tracked automatically. The dialect is part of the name because a Postgres table is not assignable to a SQLite one. Locked by type-level assertions in `packages/schema/src/drizzle/schema-types.test.ts` (enforced by `tsc --noEmit`).
 
 **Server-derived `findings.tenantId`:** `tenantId` is **server-derived** — injected from the authenticated context, never accepted from a request body. `packages/schema/src/zod/finding.ts` now mirrors the events pattern: the full `Finding` row schema carries `tenantId` (restoring Zod↔Drizzle parity with `findings.tenant_id`), and `DetectedFinding = Finding.omit({ tenantId: true })` is the producer-side shape. The future findings repository injects `tenantId` from the tenant scope on write — exactly as `insertEvents(scope, batch, userId)` reads `scope.tenantId` for `IngestEvent` — giving a single source of truth that lines up with the Postgres RLS `WITH CHECK (tenant_id = current_setting('app.tenant_id'))`. Decision locked by `packages/schema/src/zod/finding.test.ts`.

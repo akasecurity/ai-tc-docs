@@ -58,7 +58,7 @@ The stack is a TypeScript-strict pnpm monorepo:
     MODE=local STORAGE_DRIVER=sqlite \
       AKA_LOCAL_TOKEN=mytoken1234567890 \
       MIGRATE_ON_START=true \
-      pnpm --filter @aka/backend dev
+      pnpm --filter @alsoknownassecurity/backend dev
     ```
 
 === "Docker"

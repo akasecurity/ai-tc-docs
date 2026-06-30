@@ -125,10 +125,10 @@ Detects internal code and infrastructure context that should not leave the organ
 ## Running the test suite
 
 ```bash
-pnpm --filter @aka/detections test
+pnpm --filter @alsoknownassecurity/detections test
 
 # Watch mode during rule development
-pnpm --filter @aka/detections test -- --watch
+pnpm --filter @alsoknownassecurity/detections test -- --watch
 ```
 
 Fixture tests auto-discover across all packs - no need to register new rules manually.

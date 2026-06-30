@@ -38,7 +38,7 @@ The manifest is intentionally minimal. `name` becomes the command namespace, so 
 
 ## Architecture in one paragraph
 
-Every hook invocation is a **fresh, short-lived process**: Claude Code pipes a JSON event to the script's stdin and reads a JSON decision from stdout. The hook path is fully local — policy comes from a disk cache (`~/.aka/policy-cache.json`), detection runs in-process via `@aka/detections` (rule packs are bundled into the scripts at build time), and events are appended to a disk queue (`~/.aka/event-queue.jsonl`). The only network I/O lives in `scripts/sync.js`, which hooks spawn **detached** when the policy cache is stale: it refreshes the bundle and flushes the queue. A dead backend therefore costs nothing on the hook path.
+Every hook invocation is a **fresh, short-lived process**: Claude Code pipes a JSON event to the script's stdin and reads a JSON decision from stdout. The hook path is fully local — policy comes from a disk cache (`~/.aka/policy-cache.json`), detection runs in-process via `@alsoknownassecurity/detections` (rule packs are bundled into the scripts at build time), and events are appended to a disk queue (`~/.aka/event-queue.jsonl`). The only network I/O lives in `scripts/sync.js`, which hooks spawn **detached** when the policy cache is stale: it refreshes the bundle and flushes the queue. A dead backend therefore costs nothing on the hook path.
 
 ## Hooks
 
@@ -129,7 +129,7 @@ node apps/plugin-claude-code/scripts/query.js findings
 }
 ```
 
-- **`runMode`** — `standalone` (default, no Docker) or `attached` (wired to a local backend). The runtime resolves its data path from this value via the **`DataGateway`** port (`@aka/plugin-runtime`): standalone reads/writes the local SQLite store at `~/.aka/data/aka.db` (`@aka/persistence`); attached goes through the backend's HTTP API (`@aka/client`) and pulls the org's centrally-managed ruleset into a local cache that drives in-process detection.
+- **`runMode`** — `standalone` (default, no Docker) or `attached` (wired to a local backend). The runtime resolves its data path from this value via the **`DataGateway`** port (`@alsoknownassecurity/plugin-runtime`): standalone reads/writes the local SQLite store at `~/.aka/data/aka.db` (`@alsoknownassecurity/persistence`); attached goes through the backend's HTTP API (`@alsoknownassecurity/client`) and pulls the org's centrally-managed ruleset into a local cache that drives in-process detection.
 - **`policy`** — `redact` (replace sensitive values in place where the host allows) or `warn` (surface a warning, never modify content).
 - **`historicalAccess`** — `session-only` (default) or `full`. Consent for scanning pre-install surfaces — scratch/temp files, agent memory and prior conversation transcripts — for already-leaked secrets. Defaults to `session-only` so historical scanning is always an explicit opt-in, never an assumed grant on upgrade; declining still leaves AKA the working tree, the live session, git history and pointed scans to review.
 
@@ -188,7 +188,7 @@ Hooks invoke `node` at runtime, so `node` must be on the user's PATH — note th
 Load the plugin for a single session without a marketplace install:
 
 ```bash
-pnpm turbo run build --filter=@aka/plugin-claude-code   # tsup bundles src → scripts/*.js (self-contained)
+pnpm turbo run build --filter=@alsoknownassecurity/plugin-claude-code   # tsup bundles src → scripts/*.js (self-contained)
 claude --plugin-dir ./apps/plugin-claude-code           # load for one session
 # after a rebuild, run /reload-plugins inside the session
 ```
@@ -204,7 +204,7 @@ End users do **not** clone this repo. The plugin is distributed as a published n
 /plugin install aka@aka-control-plane
 ```
 
-Why npm rather than a git source: a Claude Code marketplace install **copies the source as-is and never runs a build step**, and the hook scripts (`scripts/*.js`) are git-ignored. A `github` / `git-subdir` source would therefore ship a plugin whose `hooks.json` points at files that don't exist. The npm source instead ships the built, self-contained bundle (the `@aka/*` workspace deps and `zod` are inlined by `tsup`, so the published package has **no runtime dependencies**). `node` must still be on the user's PATH — the hooks invoke it.
+Why npm rather than a git source: a Claude Code marketplace install **copies the source as-is and never runs a build step**, and the hook scripts (`scripts/*.js`) are git-ignored. A `github` / `git-subdir` source would therefore ship a plugin whose `hooks.json` points at files that don't exist. The npm source instead ships the built, self-contained bundle (the `@alsoknownassecurity/*` workspace deps and `zod` are inlined by `tsup`, so the published package has **no runtime dependencies**). `node` must still be on the user's PATH — the hooks invoke it.
 
 Releasing is automated by [`.github/workflows/release-plugin.yml`](https://github.com/alsoknownassecurity/ai-control-plane/blob/main/.github/workflows/release-plugin.yml):
 

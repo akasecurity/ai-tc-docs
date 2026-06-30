@@ -4,7 +4,7 @@ All API routes are served by `apps/backend` on port 4000 (default).
 
 ## Interactive docs (OpenAPI)
 
-The backend generates an OpenAPI 3.1 spec directly from the `@aka/schema` Zod
+The backend generates an OpenAPI 3.1 spec directly from the `@alsoknownassecurity/schema` Zod
 contracts — the same schemas used to validate requests and serialize responses,
 so the spec never drifts from the running code.
 
@@ -22,15 +22,15 @@ public; only `publishPackVersion` / `forkPack` require a bearer token (marked wi
 
 ### Generated client
 
-`@aka/client` is **generated** from these two specs with
+`@alsoknownassecurity/client` is **generated** from these two specs with
 [Hey API](https://heyapi.dev) (`@hey-api/openapi-ts`) — not hand-written. The
-pipeline is Zod (`@aka/schema`) → Fastify OpenAPI spec → typed client, so the
+pipeline is Zod (`@alsoknownassecurity/schema`) → Fastify OpenAPI spec → typed client, so the
 client cannot drift from the server. To regenerate after changing a route or
 schema:
 
 ```bash
-pnpm --filter @aka/client gen:openapi          # dump both specs + regenerate
-pnpm --filter @aka/client gen:openapi:check     # CI: regenerate and fail on drift
+pnpm --filter @alsoknownassecurity/client gen:openapi          # dump both specs + regenerate
+pnpm --filter @alsoknownassecurity/client gen:openapi:check     # CI: regenerate and fail on drift
 ```
 
 The dumped specs (`packages/client/openapi/*.json`) and the generated output
@@ -404,7 +404,7 @@ Returns the policy bundle for the authenticated tenant. The Claude Code plugin c
 }
 ```
 
-The current implementation returns the default policy bundle (`DEFAULT_ACTIONS` from `@aka/schema`). A full policy editor is on the roadmap.
+The current implementation returns the default policy bundle (`DEFAULT_ACTIONS` from `@alsoknownassecurity/schema`). A full policy editor is on the roadmap.
 
 **Example:**
 
@@ -1461,7 +1461,7 @@ Each item is a raw `Finding` (flat, per-instance). `nextCursor` is `null` when n
 
 Returns paginated, filterable, searchable finding groups with embedded instances and per-filter facet counts. Used by the dashboard.
 
-> The plugin and CLI use `GET /v1/findings/flat` (see above) which returns the flat `ListFindingsResponse` shape expected by `@aka/client`'s `listFindings()` wrapper.
+> The plugin and CLI use `GET /v1/findings/flat` (see above) which returns the flat `ListFindingsResponse` shape expected by `@alsoknownassecurity/client`'s `listFindings()` wrapper.
 
 **operationId:** `listFindings`. **Tags:** `findings`. **Auth:** Bearer token required.
 
