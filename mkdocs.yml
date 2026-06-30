@@ -62,6 +62,7 @@ nav:
   - Home: index.md
   - Getting Started:
       - Quickstart: getting-started/quickstart.md
+      - CLI (aka): getting-started/cli.md
       - Configuration: getting-started/configuration.md
   - Architecture:
       - System Overview: architecture/overview.md
