@@ -204,13 +204,30 @@ End users do **not** clone this repo. The plugin is distributed as a published n
 /plugin install aka@aka-control-plane
 ```
 
+Run these in the Claude Code **terminal CLI** (`claude`) — `/plugin` marketplace management is not exposed in the IDE/editor extension surfaces.
+
+> **Pre-release distribution — private GitHub Packages.** While AKA is pre-release we
+> publish **only private artifacts to GitHub Packages** — nothing goes to the public npm
+> registry. The `/plugin install` above resolves an npm source, so it can only be fetched
+> with a valid `~/.npmrc` that points the `@alsoknownassecurity` scope at GitHub Packages
+> **and** carries a GitHub token with `read:packages` access to our packages:
+>
+> ```ini
+> @alsoknownassecurity:registry=https://npm.pkg.github.com
+> //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+> ```
+>
+> Write it once (`chmod 600 ~/.npmrc`) before running `/plugin install`; without it the
+> marketplace fetch fails with `401`/`403`. This requirement disappears once the project
+> is public.
+
 Why npm rather than a git source: a Claude Code marketplace install **copies the source as-is and never runs a build step**, and the hook scripts (`scripts/*.js`) are git-ignored. A `github` / `git-subdir` source would therefore ship a plugin whose `hooks.json` points at files that don't exist. The npm source instead ships the built, self-contained bundle (the `@alsoknownassecurity/*` workspace deps and `zod` are inlined by `tsup`, so the published package has **no runtime dependencies**). `node` must still be on the user's PATH — the hooks invoke it.
 
 Releasing is automated by [`.github/workflows/release-plugin.yml`](https://github.com/alsoknownassecurity/ai-control-plane/blob/main/.github/workflows/release-plugin.yml):
 
 1. Bump `version` in both `apps/plugin-claude-code/package.json` and `.claude-plugin/plugin.json`.
 2. Push a tag `plugin-v<version>` (e.g. `plugin-v0.1.0`).
-3. CI builds with Turbo, verifies the tag matches both manifests, smoke-tests the fail-open contract, publishes to npm (`NPM_TOKEN` secret), and attaches the tarball to a GitHub Release.
+3. CI builds with Turbo, verifies the tag matches both manifests, smoke-tests the fail-open contract, publishes to **private GitHub Packages** (`npm.pkg.github.com`, authenticated with the workflow's built-in `GITHUB_TOKEN`), and attaches the tarball to a GitHub Release.
 
 The marketplace's npm source is unpinned, so `/plugin install` and `/plugin update` resolve the latest published version — the npm package version is the single source of truth.
 
