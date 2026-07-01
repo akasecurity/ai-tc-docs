@@ -14,7 +14,10 @@ What you get:
 - `aka dashboard` — open the local web dashboard
 - `aka tui` — an interactive terminal dashboard
 - `aka plugins` — install/manage agent plugins (Claude Code, …)
+- `aka check-updates` — see whether the CLI or your plugins have updates
+- `aka update` — update the CLI and/or plugins to the latest version
 - `aka attach` — (scaffold) point a standalone setup at an enterprise platform
+- `aka --version` — print the installed CLI version
 
 ---
 
@@ -188,18 +191,48 @@ The CLI is an optional **hub** for installing agent plugins — but each plugin 
 installs on its own, so the CLI is never required.
 
 ```bash
-aka plugins list                 # show available agents + which are active locally
+aka plugins list                 # show available agents, installed version, active state
 aka plugins install claude-code  # install / set up an agent plugin
 ```
 
-- **Claude Code** is distributed through the **AKA marketplace** (which you add inside
-  Claude Code), not npm. `aka plugins install claude-code` doesn't install anything
-  itself yet — it prints how to add the AKA marketplace in Claude Code; then run
-  `aka init`.
+- **Claude Code** is distributed through the **AKA marketplace**, and
+  `aka plugins install claude-code` installs it end-to-end: it adds the marketplace
+  and installs the plugin by delegating to the `claude` CLI's plugin manager, then
+  reminds you to restart Claude Code and run `aka init`. If the `claude` CLI isn't on
+  your `PATH`, it falls back to printing the in-app `/plugin` commands to run instead.
 - Other agents (Cursor, GitHub Copilot, …) appear as **coming soon** until they ship.
 
 `aka plugins list` is read-only — it will **not** create a local store if you haven't
 run `aka init` yet.
+
+---
+
+## Keeping up to date
+
+The CLI and your installed plugins are versioned independently. Two commands keep
+them current:
+
+```bash
+aka check-updates   # read-only: show installed vs latest for the CLI + each plugin
+aka update          # update everything that's behind (asks before applying)
+aka update cli      # update just the CLI
+aka update claude-code   # update just one plugin
+```
+
+- `aka check-updates` changes nothing — it just reports what's available. Latest
+  versions are resolved with `npm view` through your existing `~/.npmrc` auth (the
+  same one that installed the packages); if the registry is unreachable, "Latest"
+  shows as **unknown** and nothing is flagged.
+- `aka update` shows what would change and **prompts for confirmation** before
+  applying. Pass `--yes` (or `-y`) to skip the prompt (required when there's no
+  interactive terminal, e.g. in a script). The CLI updates itself with
+  `npm install -g @alsoknownassecurity/cli@latest`; plugins update through the `claude` plugin
+  manager (**restart Claude Code afterwards** to load the new version).
+- After other commands, the CLI prints a one-line **notice** when an update — or a
+  newly available plugin — is waiting, with the exact command to run. It's computed
+  from a once-a-day cached check (refreshed in the background, never blocking), is
+  suppressed when output isn't a terminal, and can be turned off per run with
+  `--no-update-check`.
 
 ---
 

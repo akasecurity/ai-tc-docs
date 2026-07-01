@@ -213,6 +213,8 @@ End users do **not** clone this repo. The plugin is distributed as a published n
 
 Run these in the Claude Code **terminal CLI** (`claude`) — `/plugin` marketplace management is not exposed in the IDE/editor extension surfaces.
 
+If you have the [`aka` CLI](../getting-started/cli.md) installed, `aka plugins install claude-code` runs both steps for you (it delegates to the same `claude plugin` manager), and `aka update claude-code` updates the plugin later. Either way, restart Claude Code afterwards to load the change.
+
 > **Pre-release distribution — private GitHub Packages.** While AKA is pre-release we
 > publish **only private artifacts to GitHub Packages** — nothing goes to the public npm
 > registry. The `/plugin install` above resolves an npm source, so it can only be fetched
