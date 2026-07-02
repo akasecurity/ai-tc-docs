@@ -5,7 +5,7 @@ The detection engine lives in `packages/detections`. It is intentionally **pure*
 ## Public API
 
 ```typescript
-import { scan, redact, registerPack, getLoadedRules } from '@aka/detections';
+import { scan, redact, registerPack, getLoadedRules } from '@alsoknownassecurity/detections';
 
 // Scan a text string against all loaded rules (or a specific set)
 const findings = scan(text, rules?);

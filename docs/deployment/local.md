@@ -33,7 +33,7 @@ MODE=local \
   AKA_LOCAL_TOKEN=mytoken1234567890 \
   SQLITE_PATH=./aka.db \
   MIGRATE_ON_START=true \
-  pnpm --filter @aka/backend dev
+  pnpm --filter @alsoknownassecurity/backend dev
 ```
 
 ## What `MIGRATE_ON_START` does
@@ -60,7 +60,7 @@ Set `SQLITE_PATH` to any writable path:
 The dashboard dev server proxies API calls to the backend:
 
 ```bash
-pnpm --filter @aka/dashboard dev
+pnpm --filter @alsoknownassecurity/dashboard dev
 ```
 
 Navigate to `http://localhost:5173`. The proxy is configured in `apps/dashboard/vite.config.ts` to forward `/v1` and `/healthz` to `localhost:4000`.
@@ -71,7 +71,7 @@ With Python installed:
 
 ```bash
 pip install -r apps/docs/requirements.txt
-pnpm --filter @aka/docs dev
+pnpm --filter @alsoknownassecurity/docs dev
 ```
 
 Navigate to `http://localhost:8000`.
@@ -82,13 +82,13 @@ Navigate to `http://localhost:8000`.
 # Terminal 1 — backend
 MODE=local STORAGE_DRIVER=sqlite AKA_LOCAL_TOKEN=mytoken1234567890 \
   MIGRATE_ON_START=true SQLITE_PATH=./aka.db \
-  pnpm --filter @aka/backend dev
+  pnpm --filter @alsoknownassecurity/backend dev
 
 # Terminal 2 — dashboard
-pnpm --filter @aka/dashboard dev
+pnpm --filter @alsoknownassecurity/dashboard dev
 
 # Terminal 3 — docs (optional)
-pnpm --filter @aka/docs dev
+pnpm --filter @alsoknownassecurity/docs dev
 ```
 
 ## Applying migrations manually
@@ -97,12 +97,12 @@ To apply migrations without starting the server (useful for CI or scripts):
 
 ```bash
 # Via the migrator CLI
-pnpm --filter @aka/migrator start -- sqlite \
+pnpm --filter @alsoknownassecurity/migrator start -- sqlite \
   --db-path ./aka.db \
   --migrations-dir apps/backend/drizzle/sqlite
 
 # Or directly with drizzle-kit
-pnpm --filter @aka/backend migrate
+pnpm --filter @alsoknownassecurity/backend migrate
 ```
 
 ## Typical local workflow
@@ -111,7 +111,7 @@ pnpm --filter @aka/backend migrate
 # 1. Start the backend with fresh DB
 rm -f ./aka.db
 MODE=local STORAGE_DRIVER=sqlite AKA_LOCAL_TOKEN=mytoken1234567890 \
-  MIGRATE_ON_START=true pnpm --filter @aka/backend dev &
+  MIGRATE_ON_START=true pnpm --filter @alsoknownassecurity/backend dev &
 
 # 2. Verify it's up
 curl http://localhost:4000/healthz

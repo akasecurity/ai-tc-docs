@@ -86,15 +86,24 @@ The container serves both the API and the dashboard from port 4000:
 
 ## Production docker-compose
 
-`docker/docker-compose.yml` is the production shape — a single `app` service with an optional `postgres` profile:
+`docker/docker-compose.yml` is the production shape — a single `app` service with an optional `postgres` profile. It **requires** two secrets and refuses to start if either is unset:
+
+- `BETTER_AUTH_SECRET` — session-signing secret, **≥32 characters** (`openssl rand -hex 32`).
+- `BETTER_AUTH_URL` — the **browser-visible origin** users navigate to (e.g. `https://aka.example.com`); use `http://localhost:4000` only for a local trial, never in a real deployment.
 
 ```bash
 # SQLite (simplest self-hosted)
-docker compose -f docker/docker-compose.yml up
+BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
+  BETTER_AUTH_URL=http://localhost:4000 \
+  docker compose -f docker/docker-compose.yml up
 
 # With Postgres
-docker compose -f docker/docker-compose.yml --profile postgres up
+BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
+  BETTER_AUTH_URL=http://localhost:4000 \
+  docker compose -f docker/docker-compose.yml --profile postgres up
 ```
+
+Passing them inline like this is fine for a quick trial; for a real deployment put them in the `.env` file below so they persist and stay out of your shell history.
 
 ### Environment file
 
@@ -105,7 +114,9 @@ Create a `.env` file for production secrets (do not commit this):
 MODE=self-hosted
 STORAGE_DRIVER=postgres
 DATABASE_URL=postgresql://aka:supersecret@db:5432/aka
-AKA_LOCAL_TOKEN=<output of: openssl rand -hex 32>
+# Required — the app refuses to start without these.
+BETTER_AUTH_SECRET=<output of: openssl rand -hex 32>   # ≥32 chars
+BETTER_AUTH_URL=https://aka.example.com                # public origin users navigate to
 MIGRATE_ON_START=true
 VERSION=1.0.0
 ```

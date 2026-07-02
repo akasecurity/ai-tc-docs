@@ -4,7 +4,7 @@ All API routes are served by `apps/backend` on port 4000 (default).
 
 ## Interactive docs (OpenAPI)
 
-The backend generates an OpenAPI 3.1 spec directly from the `@aka/schema` Zod
+The backend generates an OpenAPI 3.1 spec directly from the `@alsoknownassecurity/schema` Zod
 contracts — the same schemas used to validate requests and serialize responses,
 so the spec never drifts from the running code.
 
@@ -22,15 +22,15 @@ public; only `publishPackVersion` / `forkPack` require a bearer token (marked wi
 
 ### Generated client
 
-`@aka/client` is **generated** from these two specs with
+`@alsoknownassecurity/client` is **generated** from these two specs with
 [Hey API](https://heyapi.dev) (`@hey-api/openapi-ts`) — not hand-written. The
-pipeline is Zod (`@aka/schema`) → Fastify OpenAPI spec → typed client, so the
+pipeline is Zod (`@alsoknownassecurity/schema`) → Fastify OpenAPI spec → typed client, so the
 client cannot drift from the server. To regenerate after changing a route or
 schema:
 
 ```bash
-pnpm --filter @aka/client gen:openapi          # dump both specs + regenerate
-pnpm --filter @aka/client gen:openapi:check     # CI: regenerate and fail on drift
+pnpm --filter @alsoknownassecurity/client gen:openapi          # dump both specs + regenerate
+pnpm --filter @alsoknownassecurity/client gen:openapi:check     # CI: regenerate and fail on drift
 ```
 
 The dumped specs (`packages/client/openapi/*.json`) and the generated output
@@ -313,6 +313,84 @@ curl "http://localhost:4000/v1/events?limit=10" \
 
 ---
 
+## POST /v1/inventory
+
+Idempotent upsert of a session's **inventory dimensions** (the [Meta] Data Model). The body is an `InventoryContext` — the machine/repo facts the plugin resolves (`host`, `harness`, `project`). The **account** (User/Account) dimension is _not_ accepted from the client; it is derived server-side from the authenticated user. Content-addressed, tenant-scoped ids are computed server-side and returned, so repeat sessions on the same machine/project collapse to one row each.
+
+**Request body** (all members optional):
+
+```json
+{
+  "host": {
+    "objectType": "host",
+    "identityKey": "stable-machine-id",
+    "title": "my-laptop",
+    "attributes": {
+      "host_name": "my-laptop",
+      "os": "darwin",
+      "os_version": "25.5.0",
+      "arch": "arm64"
+    }
+  },
+  "harness": {
+    "objectType": "harness",
+    "identityKey": "claude-code",
+    "title": "Claude Code",
+    "attributes": { "harness_version": "1.2.3", "interface": "cli" }
+  },
+  "project": { "url": "git@github.com:org/repo.git", "name": "repo", "attributes": {} }
+}
+```
+
+Only the `identityKey` (per `objectType`) is hashed into the content-addressed id; everything else rides in the mutable `attributes` bag (Type-1 / overwrite-to-latest, with `first_seen` pinned).
+
+**Response `200 OK`** — the resolved ids, ready to stamp onto a Session audit row:
+
+```json
+{ "hostId": "…", "harnessId": "…", "accountId": "…", "sourceProjectId": "…" }
+```
+
+---
+
+## POST /v1/audit-events
+
+Append one **audit-event fact** — e.g. the Session root opened at `SessionStart`. Idempotent on the event `id` (re-sending the same id is a no-op). The `user_id` is server-derived from auth; the inventory FKs (`hostId`/`harnessId`/`sourceProjectId`) are the ids returned by `POST /v1/inventory`.
+
+**Request body:**
+
+```json
+{
+  "id": "claude-session-id",
+  "eventType": "session",
+  "startedAt": "2026-06-26T20:00:00Z",
+  "hostId": "…",
+  "harnessId": "…",
+  "sourceProjectId": "…",
+  "attributes": { "os_version": "25.5.0", "harness_version": "1.2.3" }
+}
+```
+
+**Response `200 OK`:** `{ "accepted": true }`
+
+---
+
+## GET /v1/facets
+
+Distinct filter-facet values for the authenticated tenant, read from the small inventory dimension (never by scanning the audit fact table). Powers the host/harness/project/os filters on the dashboard read surfaces.
+
+**Response `200 OK`:**
+
+```json
+{
+  "hosts": ["my-laptop"],
+  "harnesses": ["Claude Code"],
+  "osVersions": ["25.5.0"],
+  "projects": ["repo"]
+}
+```
+
+---
+
 ## GET /v1/policy-bundle
 
 Returns the policy bundle for the authenticated tenant. The Claude Code plugin caches this bundle and uses it for in-process policy resolution.
@@ -336,7 +414,7 @@ Returns the policy bundle for the authenticated tenant. The Claude Code plugin c
 }
 ```
 
-The current implementation returns the default policy bundle (`DEFAULT_ACTIONS` from `@aka/schema`). A full policy editor is on the roadmap.
+The current implementation returns the default policy bundle (`DEFAULT_ACTIONS` from `@alsoknownassecurity/schema`). A full policy editor is on the roadmap.
 
 **Example:**
 
@@ -385,6 +463,134 @@ curl -X POST http://localhost:4000/v1/policies \
   -H "Authorization: Bearer mytoken1234567890" \
   -H "Content-Type: application/json" \
   -d '{"scope":"repo","target":{"category":"secret"},"action":"block","enabled":true}'
+```
+
+---
+
+## GET /v1/policies/stats
+
+Returns aggregate counts for the built-in policy catalog. Requires an authenticated session.
+
+**Query params:** none
+
+**Response `200 OK`** — `PolicyStatsResponse`:
+
+```json
+{
+  "policies": 4,
+  "builtin": 4,
+  "custom": 0,
+  "detectionsGoverned": 2
+}
+```
+
+- `policies` = `builtin + custom` (always 4 in Milestone 1)
+- `builtin` = count of server-defined built-in policies (always 4)
+- `custom` = count of tenant-defined custom policies (always 0 in Milestone 1)
+- `detectionsGoverned` = count of installed packs with a non-null `policyId` (live DB value)
+
+**Errors:**
+
+| Status | `code`         | When                |
+| ------ | -------------- | ------------------- |
+| `401`  | `UNAUTHORIZED` | No valid auth token |
+
+> **Registration order (AC-8):** `/v1/policies/stats` is registered before `/v1/policies/:id`
+> in the route file so Fastify resolves `stats` as a static segment, not a slug parameter.
+
+**Example:**
+
+```bash
+curl http://localhost:4000/v1/policies/stats \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
+## GET /v1/policies
+
+Returns the built-in policy catalog for the authenticated tenant. Requires an authenticated session.
+
+**Query params:**
+
+| Param  | Type                    | Required | Default | Notes                        |
+| ------ | ----------------------- | -------- | ------- | ---------------------------- |
+| `kind` | `'builtin' \| 'custom'` | no       | —       | Omit to return all built-ins |
+
+**Response `200 OK`** — `ListPoliciesResponse` with `items: PolicyListItem[]`:
+
+```json
+{
+  "items": [
+    { "id": "monitor", "kind": "builtin", "name": "Monitor", "enabled": true, "usedByCount": 0 },
+    { "id": "warn", "kind": "builtin", "name": "Warn", "enabled": true, "usedByCount": 0 },
+    { "id": "redact", "kind": "builtin", "name": "Redact", "enabled": true, "usedByCount": 2 },
+    { "id": "block", "kind": "builtin", "name": "Block", "enabled": true, "usedByCount": 1 }
+  ]
+}
+```
+
+Items are always returned in the fixed order: `monitor → warn → redact → block`.
+`usedByCount` reflects the current count of installed packs assigned to each policy id.
+When `kind=custom`, returns `{ "items": [] }` (custom policies are deferred to a future milestone).
+
+**Errors:**
+
+| Status | `code`             | When                                |
+| ------ | ------------------ | ----------------------------------- |
+| `400`  | `VALIDATION_ERROR` | `kind` is not `builtin` or `custom` |
+| `401`  | `UNAUTHORIZED`     | No valid auth token                 |
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/policies?kind=builtin" \
+  -H "Authorization: Bearer mytoken1234567890"
+```
+
+---
+
+## GET /v1/policies/:id
+
+Returns the full detail for a single built-in policy. Requires an authenticated session.
+
+**Path params:**
+
+| Param | Description                                                   |
+| ----- | ------------------------------------------------------------- |
+| `id`  | Built-in policy slug: `monitor`, `warn`, `redact`, or `block` |
+
+**Response `200 OK`** — `PolicyDetail`:
+
+```json
+{
+  "specVersion": 1,
+  "id": "redact",
+  "kind": "builtin",
+  "name": "Redact",
+  "enabled": true,
+  "description": "Automatically strip the matched value from the request, then continue.",
+  "usedBy": [
+    { "id": "aka/us-ssn", "name": "US Social Security numbers", "ruleCount": 1, "enabled": true }
+  ]
+}
+```
+
+`usedBy` contains all installed packs in the tenant that have been assigned this `policyId`.
+Each `UsedByItem` has `id` (`${namespace}/${packId}`), `name`, `ruleCount`, and `enabled`.
+
+**Errors:**
+
+| Status | `code`             | Convention  | When                                    |
+| ------ | ------------------ | ----------- | --------------------------------------- |
+| `401`  | `UNAUTHORIZED`     | UPPER_SNAKE | No valid auth token                     |
+| `404`  | `policy_not_found` | lower_snake | `id` is not one of the 4 built-in slugs |
+
+**Example:**
+
+```bash
+curl http://localhost:4000/v1/policies/redact \
+  -H "Authorization: Bearer mytoken1234567890"
 ```
 
 ---
@@ -792,7 +998,8 @@ Both are wrapped in the same envelope: `{ "error": { "code": "...", "message": "
 
 ## PATCH /v1/installed-packs/:namespace/:packId
 
-Toggle the `enabled` flag on an installed detection pack. Requires an authenticated session.
+Partially updates an installed detection pack. Supports toggling `enabled` and/or assigning a
+`policyId`. Requires an authenticated session.
 
 **Path params:**
 
@@ -801,13 +1008,23 @@ Toggle the `enabled` flag on an installed detection pack. Requires an authentica
 | `namespace` | Pack publisher namespace (e.g. `aka`)  |
 | `packId`    | Pack identifier (e.g. `cloud-secrets`) |
 
-**Request body:**
+**Request body** (`PatchInstalledPackRequest`) — at least one field must be present:
+
+| Field      | Type             | Required | Notes                                                                           |
+| ---------- | ---------------- | -------- | ------------------------------------------------------------------------------- |
+| `enabled`  | `boolean`        | no       | Toggle pack on/off                                                              |
+| `policyId` | `string \| null` | no       | Assign a built-in policy (`monitor\|warn\|redact\|block`) or `null` to unassign |
+
+An empty body `{}` returns `400 VALIDATION_ERROR`.
+
+**Examples:**
 
 ```json
-{ "enabled": true }
+{ "enabled": false }
+{ "policyId": "redact" }
+{ "policyId": null }
+{ "enabled": false, "policyId": "block" }
 ```
-
-At least one field must be present — an empty body `{}` returns `400 VALIDATION_ERROR`.
 
 **Response `200 OK`** — the updated `InstalledPack` resource:
 
@@ -819,19 +1036,29 @@ At least one field must be present — an empty body `{}` returns `400 VALIDATIO
   "packId": "cloud-secrets",
   "version": "2.3.1",
   "name": "Cloud Credentials",
-  "enabled": true
+  "enabled": true,
+  "policyId": "redact"
 }
 ```
+
+`policyId` is absent when the field is null/unassigned (nullable-optional pattern).
 
 **Errors:**
 
 | Status | `code`                     | Convention  | When                                             |
 | ------ | -------------------------- | ----------- | ------------------------------------------------ |
 | `400`  | `VALIDATION_ERROR`         | UPPER_SNAKE | Body is empty or does not match the schema (Zod) |
+| `400`  | `unknown_policy`           | lower_snake | `policyId` is not one of the 4 built-in slugs    |
 | `401`  | `UNAUTHORIZED`             | UPPER_SNAKE | No valid auth token                              |
 | `404`  | `installed_pack_not_found` | lower_snake | No installed pack with that namespace/packId     |
 
 > **Permission note:** this endpoint does NOT currently return `403 Forbidden`. The codebase has no read/write permission layer — all authenticated tenant users are full-access. Do not build frontend logic against a `403` response; it will not fire.
+
+> **Half-state note (Milestone 1):** `policyId` is recorded in the database and surfaced in
+> the API, but the enforcement engine currently uses category-based policies
+> (`mergePolicyBundle`/`resolveAction`) — not `policyId`. Assigning `block` to a `pii`-category
+> pack shows `block` in the UI, but the engine still executes `redact`. A future milestone
+> will rewire enforcement to honour `policyId`.
 
 **Example:**
 
@@ -839,7 +1066,7 @@ At least one field must be present — an empty body `{}` returns `400 VALIDATIO
 curl -X PATCH "http://localhost:4000/v1/installed-packs/aka/cloud-secrets" \
   -H "Authorization: Bearer mytoken1234567890" \
   -H "Content-Type: application/json" \
-  -d '{"enabled": false}'
+  -d '{"policyId": "block"}'
 ```
 
 ---
@@ -1156,13 +1383,929 @@ curl -X POST "http://localhost:4000/v1/detections/aka%2Fcloud-secrets/update" \
 
 ---
 
+## GET /v1/findings/stats
+
+Returns unfiltered totals for the authenticated tenant's findings — drives the navigation badge count.
+
+**operationId:** `getFindingStats`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**Response `200 OK`:**
+
+```json
+{
+  "findings": 131,
+  "groups": 22,
+  "bySeverity": { "critical": 4, "high": 9, "medium": 6, "low": 3 }
+}
+```
+
+`findings` = total instance count; `groups` = distinct rule groups; `bySeverity` counts groups (not instances).
+
+> **Note:** counts are computed in-memory over the most recent findings and are
+> approximate for very large tenants (currently capped at ~2000 findings). Exact
+> totals land with the planned SQL aggregation (`COUNT … GROUP BY`). Treat the
+> badge as indicative, not authoritative, at high volume.
+
+**Errors:**
+
+| Status | `code`         | When                |
+| ------ | -------------- | ------------------- |
+| `401`  | `UNAUTHORIZED` | No valid auth token |
+
+> **Permission note:** read endpoints are open to all authenticated tenant users; there is no read-side permission split.
+
+---
+
+## GET /v1/findings/flat
+
+Returns a flat, paginated list of individual finding instances — the feed consumed by the plugin and CLI. The dashboard uses the grouped `GET /v1/findings` instead.
+
+**operationId:** `listFindingsFlat`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**IMPORTANT:** registered **before** `GET /v1/findings/:groupId` — `flat` is a static segment and is never captured as a `:groupId` param.
+
+**Query parameters:**
+
+| Parameter  | Type          | Default | Description                                   |
+| ---------- | ------------- | ------- | --------------------------------------------- |
+| `limit`    | integer 1–200 | `50`    | Page size                                     |
+| `cursor`   | string        | —       | Opaque pagination cursor from `nextCursor`    |
+| `severity` | string        | —       | Filter by severity (`critical`, `high`, etc.) |
+| `category` | string        | —       | Filter by detection category                  |
+| `eventId`  | UUID          | —       | Filter to findings for a specific event       |
+
+**Response `200 OK`** — flat `ListFindingsResponse`:
+
+```json
+{
+  "items": [
+    {
+      "id": "10000000-0000-0000-0000-000000000001",
+      "tenantId": "t1",
+      "eventId": "e0000000-0000-0000-0000-000000000001",
+      "ruleId": "aka/aws-key",
+      "category": "secret",
+      "severity": "high",
+      "span": { "start": 12, "end": 42 },
+      "maskedMatch": "AKIA••••••••7Q4F",
+      "actionTaken": "block",
+      "confidence": 0.95
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+Each item is a raw `Finding` (flat, per-instance). `nextCursor` is `null` when no further pages exist.
+
+**Errors:**
+
+| Status | `code`             | When                                        |
+| ------ | ------------------ | ------------------------------------------- |
+| `400`  | `VALIDATION_ERROR` | Invalid query param (e.g. non-UUID eventId) |
+| `401`  | `UNAUTHORIZED`     | No valid auth token                         |
+
+---
+
+## GET /v1/findings
+
+Returns paginated, filterable, searchable finding groups with embedded instances and per-filter facet counts. Used by the dashboard.
+
+> The plugin and CLI use `GET /v1/findings/flat` (see above) which returns the flat `ListFindingsResponse` shape expected by `@alsoknownassecurity/client`'s `listFindings()` wrapper.
+
+**operationId:** `listFindings`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**Query parameters:**
+
+| Parameter  | Type                | Default | Description                                                                             |
+| ---------- | ------------------- | ------- | --------------------------------------------------------------------------------------- |
+| `severity` | `Severity[]`        | —       | Filter by group severity (repeatable: `?severity=high&severity=critical`)               |
+| `provider` | `FindingProvider[]` | —       | Filter to groups with any matching provider (repeatable)                                |
+| `action`   | `FindingAction[]`   | —       | Filter to groups with any matching action (repeatable)                                  |
+| `subtype`  | `string[]`          | —       | Filter by group subtype (repeatable)                                                    |
+| `q`        | string              | —       | Case-insensitive search over `subtype`, `category`, `maskedValue`, `repo`, `file`, `id` |
+| `groupBy`  | `'type'`            | `type`  | Only `type` is supported currently                                                      |
+| `limit`    | integer 1–100       | `50`    | Page size (groups)                                                                      |
+| `cursor`   | string              | —       | Opaque pagination cursor from `nextCursor`                                              |
+
+**Sorting:** severity desc (critical > high > medium > low), then `latestDetectedAt` desc.
+
+**Facet semantics:** each dimension computed excluding its own filter.
+
+**Response `200 OK`:**
+
+```json
+{
+  "totals": { "findings": 22, "groups": 5 },
+  "facets": {
+    "severity": [{ "value": "high", "count": 3 }],
+    "provider": [{ "value": "claudecode", "count": 4 }],
+    "action": [{ "value": "blocked", "count": 2 }],
+    "subtype": [{ "value": "aka/aws-key", "count": 1 }]
+  },
+  "items": [
+    {
+      "id": "aka/aws-key",
+      "category": "secret",
+      "subtype": "aka/aws-key",
+      "severity": "high",
+      "match": { "maskedValue": "AKIA••••••••7Q4F", "contextPrefix": "" },
+      "detection": { "id": "aka/aws-key", "name": "Cloud Credentials" },
+      "policy": { "id": "category:secret", "name": "secret" },
+      "instanceCount": 3,
+      "providers": ["claudecode", "cursor"],
+      "aggregateAction": "blocked",
+      "latestDetectedAt": "2026-06-22T10:00:00.000Z",
+      "instances": [
+        {
+          "id": "20000000-0000-0000-0000-000000000001",
+          "provider": "claudecode",
+          "repo": "payments-api",
+          "file": "src/index.ts",
+          "action": "blocked",
+          "detectedAt": "2026-06-20T10:00:00.000Z",
+          "confidence": 0.95
+        }
+      ]
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+`aggregateAction` is `null` when instances have differing actions (Mixed). `instances` are ordered newest-first.
+
+**Errors:**
+
+| Status | `code`             | When                                                |
+| ------ | ------------------ | --------------------------------------------------- |
+| `400`  | `VALIDATION_ERROR` | Invalid query params (limit out of range, bad enum) |
+| `401`  | `UNAUTHORIZED`     | No valid auth token                                 |
+
+---
+
+## GET /v1/findings/:groupId
+
+Returns the single group object with the **complete** (uncapped) instance list.
+
+**operationId:** `getFinding`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**Path params:**
+
+| Param      | Description                    |
+| ---------- | ------------------------------ |
+| `:groupId` | Rule ID (e.g. `aka%2Faws-key`) |
+
+**Response `200 OK`** — same shape as an item from `GET /v1/findings` with the full instances array.
+
+**Errors:**
+
+| Status | `code`              | When                                                    |
+| ------ | ------------------- | ------------------------------------------------------- |
+| `401`  | `UNAUTHORIZED`      | No valid auth token                                     |
+| `404`  | `finding_not_found` | Unknown groupId, or groupId belonging to another tenant |
+
+> **Permission note:** wrong-tenant groupId returns `404` (not `403`) — existence must not leak.
+
+---
+
+## GET /v1/findings/instances/:instanceId
+
+Returns a denormalized instance detail combining `FindingInstance` fields with group-level context.
+
+**operationId:** `getFindingInstance`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**IMPORTANT:** registered **before** `GET /v1/findings/:groupId` — `instances` is a static segment.
+
+**Path params:**
+
+| Param         | Description      |
+| ------------- | ---------------- |
+| `:instanceId` | Finding row UUID |
+
+**Response `200 OK`:**
+
+```json
+{
+  "id": "20000000-0000-0000-0000-000000000001",
+  "provider": "claudecode",
+  "repo": "payments-api",
+  "file": "src/index.ts",
+  "action": "blocked",
+  "detectedAt": "2026-06-20T10:00:00.000Z",
+  "confidence": 0.95,
+  "groupId": "aka/aws-key",
+  "category": "secret",
+  "subtype": "aka/aws-key",
+  "severity": "high",
+  "match": { "maskedValue": "AKIA••••••••7Q4F", "contextPrefix": "" },
+  "detection": { "id": "aka/aws-key", "name": "Cloud Credentials" },
+  "policy": { "id": "category:secret", "name": "secret" }
+}
+```
+
+**Errors:**
+
+| Status | `code`               | When                |
+| ------ | -------------------- | ------------------- |
+| `401`  | `UNAUTHORIZED`       | No valid auth token |
+| `404`  | `instance_not_found` | Unknown instanceId  |
+
+---
+
+## POST /v1/findings/:groupId/action
+
+Writes a `finding_action_overrides` record (upsert) and returns the updated group.
+
+**operationId:** `applyFindingAction`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**Path params:**
+
+| Param      | Description          |
+| ---------- | -------------------- |
+| `:groupId` | Rule ID / group slug |
+
+**Request body:**
+
+```json
+{ "action": "allowed", "instanceId": "20000000-0000-0000-0000-000000000001" }
+```
+
+| Field        | Type            | Required | Notes                                                    |
+| ------------ | --------------- | -------- | -------------------------------------------------------- |
+| `action`     | `FindingAction` | Yes      | New enforcement decision (excludes `quarantined`)        |
+| `instanceId` | string          | No       | When omitted, applies override to all instances in group |
+
+`quarantined` is system-assigned and is excluded from the request contract, so
+sending it fails request validation → `400 VALIDATION_ERROR` (like any other
+invalid `action` value).
+
+**Response `200 OK`** — updated group (same shape as `GET /v1/findings/:groupId`).
+
+**Errors:**
+
+| Status | `code`               | When                                                             |
+| ------ | -------------------- | ---------------------------------------------------------------- |
+| `400`  | `VALIDATION_ERROR`   | Invalid `action` value (including system-assigned `quarantined`) |
+| `401`  | `UNAUTHORIZED`       | No valid auth token                                              |
+| `403`  | `forbidden`          | Caller has a read-only role (`security_viewer`)                  |
+| `404`  | `finding_not_found`  | Unknown groupId, or group has no instances                       |
+| `404`  | `instance_not_found` | `instanceId` not found or does not belong to groupId             |
+
+> **Permission note:** applying an override requires a writable role. Users with
+> the read-only `security_viewer` role get `403 forbidden`; `owner`, `admin`, and
+> `member` can apply overrides. Read endpoints remain open to all authenticated
+> tenant users.
+
+---
+
+## GET /v1/findings/export
+
+Downloads the complete filtered finding set as a file. Pagination params (`limit`, `cursor`) are ignored.
+
+**operationId:** `exportFindings`. **Tags:** `findings`. **Auth:** Bearer token required.
+
+**IMPORTANT:** registered **before** `GET /v1/findings/:groupId` — `export` is a static segment.
+
+**Query parameters:** same filter params as `GET /v1/findings` (minus `limit`/`cursor`/`groupBy`) plus:
+
+| Parameter | Type              | Default | Notes           |
+| --------- | ----------------- | ------- | --------------- |
+| `format`  | `'csv' \| 'json'` | `csv`   | Download format |
+
+**Response headers:**
+
+- `Content-Type: text/csv` (or `application/json`)
+- `Content-Disposition: attachment; filename="findings.csv"` (or `.json`)
+
+**CSV columns (normative order):** `instanceId, groupId, category, subtype, severity, provider, repo, file, action, detectedAt, confidence, policy`
+
+**Never included:** unmasked match values.
+
+**Errors:**
+
+| Status | `code`             | When                          |
+| ------ | ------------------ | ----------------------------- |
+| `400`  | `VALIDATION_ERROR` | `format=xml` or other invalid |
+| `401`  | `UNAUTHORIZED`     | No valid auth token           |
+
+**Example:**
+
+```bash
+curl "http://localhost:4000/v1/findings/export?format=csv" \
+  -H "Authorization: Bearer mytoken1234567890" \
+  -o findings.csv
+```
+
+---
+
+## Route registration order (findings)
+
+The 6 findings routes are registered in this order to prevent parametric routes shadowing static segments:
+
+1. `GET  /v1/findings/stats`
+2. `GET  /v1/findings/export`
+3. `GET  /v1/findings/instances/:instanceId`
+4. `GET  /v1/findings`
+5. `GET  /v1/findings/:groupId`
+6. `POST /v1/findings/:groupId/action`
+
+Fastify's find-my-way radix router prioritises static segments over parametric regardless of order — ordering is for readability and defensive correctness.
+
+---
+
+## Inventory API (`/v1/inventory`)
+
+> **Status: All 12 endpoints live.**
+
+**Tag:** `inventory`  
+**Auth:** Bearer token required on every endpoint. Mutations (§8, §9, §11, §12)
+additionally require inventory write permission — `403 forbidden` otherwise.
+
+| #   | Method | Path                                             | operationId         | Status   |
+| --- | ------ | ------------------------------------------------ | ------------------- | -------- |
+| §1  | `GET`  | `/v1/inventory/stats`                            | `getInventoryStats` | **Live** |
+| §2  | `GET`  | `/v1/inventory/harnesses`                        | `listHarnesses`     | **Live** |
+| §3  | `GET`  | `/v1/inventory/assets`                           | `listAssets`        | **Live** |
+| §4  | `GET`  | `/v1/inventory/assets/:assetId`                  | `getAsset`          | **Live** |
+| §5  | `GET`  | `/v1/inventory/projects`                         | `listProjects`      | **Live** |
+| §6  | `GET`  | `/v1/inventory/projects/:projectId/tree`         | `getProjectTree`    | **Live** |
+| §7  | `GET`  | `/v1/inventory/projects/:projectId/files`        | `getProjectFile`    | **Live** |
+| §8  | `PUT`  | `/v1/inventory/projects/:projectId/files/access` | `setFileAccess`     | **Live** |
+| §9  | `PUT`  | `/v1/inventory/assets/:assetId/trust`            | `setMcpTrust`       | **Live** |
+| §10 | `GET`  | `/v1/inventory/harnesses/:harnessId/events`      | `getHarnessEvents`  | **Live** |
+| §11 | `POST` | `/v1/inventory/rescan`                           | `rescanInventory`   | **Live** |
+| §12 | `POST` | `/v1/inventory/projects`                         | `connectProject`    | **Live** |
+
+---
+
+### §1 — GET /v1/inventory/stats
+
+Returns tenant-scoped aggregate counts for the Inventory overview header.
+
+**Auth:** Bearer token required.  
+**Response:** `200 InventoryStats`
+
+```
+GET /v1/inventory/stats
+Authorization: Bearer <token>
+```
+
+**Response shape** (`InventoryStats`):
+
+| Field       | Type                                            | Description                                          |
+| ----------- | ----------------------------------------------- | ---------------------------------------------------- |
+| `attention` | `number`                                        | Assets with ≥1 flag + projects with findings > 0     |
+| `byType`    | `{ project, skill, mcp, hook, config: number }` | Asset counts per type                                |
+| `harnesses` | `number`                                        | Inventory harness rows                               |
+| `mcpTrust`  | `{ known-good, risky, unapproved: number }`     | Effective MCP trust distribution (overrides applied) |
+
+Empty tenant always returns all-zero counts (never 404).
+
+---
+
+### §2 — GET /v1/inventory/harnesses
+
+Returns the tenant's harness-tree — one `HarnessSummary` per discovered harness row, each
+embedding its linked projects and categorized assets.
+
+**Auth:** Bearer token required.  
+**Query params:**
+
+| Param | Type     | Description                                                                                                 |
+| ----- | -------- | ----------------------------------------------------------------------------------------------------------- |
+| `q`   | `string` | Optional. Filters by asset `name`/`sub` (case-insensitive). Harnesses with no matching assets are excluded. |
+
+**Response:** `200 ListHarnessesResponse`
+
+```
+GET /v1/inventory/harnesses?q=notion
+Authorization: Bearer <token>
+```
+
+**Response shape** (`ListHarnessesResponse`):
+
+```json
+{
+  "items": [
+    {
+      "id": "claudecode",
+      "label": "Claude Code",
+      "kind": "claude_code",
+      "version": "1.2.0",
+      "sessions": 42,
+      "assetCount": 3,
+      "flagCount": 1,
+      "projects": [ { "id": "...", "name": "payments-api", "..." } ],
+      "categories": [
+        { "type": "mcp",   "assets": [ { "id": "...", "name": "notion-bridge", "trust": "unapproved", "..." } ] },
+        { "type": "skill", "assets": [ { "..." } ] }
+      ]
+    }
+  ]
+}
+```
+
+- `categories[]` are ordered **config → skill → mcp → hook**; the `project` type never appears.
+- `projects[]` uses the same `ProjectSummary` shape as §5 (coalesced nullable columns, effective `accessCounts`).
+- `assetCount` and `flagCount` exclude projects.
+- Empty inventory returns `{ items: [] }` (never 404).
+
+The harness `id` field is mapped from the `provider` key in the inventory `attributes` JSON
+(`claudecode | cursor | codex`). Inventory rows with unrecognized providers are silently skipped.
+
+---
+
+### §3 — GET /v1/inventory/assets
+
+Returns all non-project assets grouped by type, with flag and trust rollups.
+
+**Auth:** Bearer token required.  
+**Query params:**
+
+| Param  | Type       | Description                                                                                   |
+| ------ | ---------- | --------------------------------------------------------------------------------------------- |
+| `type` | `string[]` | Optional. Repeatable (`?type=mcp&type=skill`). Restricts groups returned. Absent = all types. |
+| `q`    | `string`   | Optional. Free-text filter on asset `name`/`sub` (case-insensitive).                          |
+
+**Response:** `200 ListAssetsResponse`
+
+```
+GET /v1/inventory/assets?type=mcp&type=skill&q=notion
+Authorization: Bearer <token>
+```
+
+**Response shape** (`ListAssetsResponse`):
+
+```json
+{
+  "groups": [
+    {
+      "type": "mcp",
+      "total": 2,
+      "trustRollup": { "known-good": 1, "unapproved": 1 },
+      "flagRollup": { "stale": 1 },
+      "items": [ { "id": "...", "name": "notion-bridge", "trust": "unapproved", "..." } ]
+    },
+    {
+      "type": "skill",
+      "total": 3,
+      "flagRollup": {},
+      "items": [ { "..." } ]
+    }
+  ]
+}
+```
+
+- `trustRollup` is present **only for the `mcp` group** and omitted for all others.
+- `flagRollup` is partial — only flag keys with non-zero counts are included.
+- `project` type never appears in groups.
+- No matches → `{ groups: [] }` (never 404).
+
+---
+
+### §4 — GET /v1/inventory/assets/:assetId
+
+Returns full detail for a single asset.
+
+**Auth:** Bearer token required.  
+**Path params:** `assetId` — the asset id.  
+**Response:** `200 AssetDetail` or `404 asset_not_found`
+
+```
+GET /v1/inventory/assets/mcp-notion-abc123
+Authorization: Bearer <token>
+```
+
+**Response shape** (`AssetDetail`):
+
+```json
+{
+  "id": "mcp-notion-abc123",
+  "type": "mcp",
+  "name": "notion-bridge",
+  "sub": "v2",
+  "flags": ["stale"],
+  "description": "Notion integration MCP server",
+  "trust": "unapproved",
+  "meta": { "server": "http://localhost:3000" },
+  "finding": null,
+  "tools": [
+    {
+      "name": "search",
+      "signature": "search(q)",
+      "description": "...",
+      "write": false,
+      "risk": "proxy-blocked"
+    }
+  ]
+}
+```
+
+- `trust` and `tools[]` are present **only for `mcp` assets**; `trust` is `null` for all other types and `tools` is absent.
+- `trust` reflects effective trust: `mcp_trust_override.trust ?? inventory_asset.trust`.
+- For an `unapproved` MCP, every tool's `risk` is non-null (the proxy blocks all calls); for other trust levels, `risk` reflects the individual tool's stored value (may be `null`).
+- `finding` is always present — an object when an active finding exists, `null` otherwise.
+  **Note:** `finding` is always `null` in this milestone. The findings JOIN is deferred and will populate once the §findings linkage lands in a later PR.
+- Unknown `assetId` → `404 { "error": { "code": "asset_not_found" } }`.
+
+---
+
+### §5 — GET /v1/inventory/projects
+
+Returns the tenant's connected source projects with per-project file access counts
+and findings counts. Access counts reflect effective access (file overrides applied).
+
+**Auth:** Bearer token required.  
+**Query params:**
+
+| Param | Type     | Description                                            |
+| ----- | -------- | ------------------------------------------------------ |
+| `q`   | `string` | Optional. Free-text filter on `name` and `repo` (URL). |
+
+**Response:** `200 ListProjectsResponse`
+
+```
+GET /v1/inventory/projects?q=payments
+Authorization: Bearer <token>
+```
+
+**Response shape** (`ListProjectsResponse`):
+
+```json
+{
+  "items": [
+    {
+      "id": "...",
+      "name": "payments-api",
+      "repo": "https://github.com/acme/payments-api",
+      "visibility": "private",
+      "language": "TypeScript",
+      "policyDefault": "approved",
+      "updatedAt": "2026-06-30T00:00:00.000Z",
+      "accessCounts": { "open": 120, "approved": 30, "blocked": 5, "total": 155 },
+      "findingsCount": 3
+    }
+  ]
+}
+```
+
+`accessCounts` reflects effective access (file-level overrides applied, not just
+stored defaults). `findingsCount` is the sum of `project_file.findingsCount` across
+all files. Empty tenant returns `{ items: [] }` (never 404).
+
+The field-level contract is defined by `ProjectSummary` in
+`packages/schema/src/zod/inventory.ts`; the generated TypeScript types and OpenAPI
+`$ref` entries are the authoritative reference for remaining planned endpoints.
+
+---
+
+### §6 — GET /v1/inventory/projects/:projectId/tree
+
+Browse or search the file tree of a connected source project.
+
+**Auth:** Bearer token required.  
+**Path params:**
+
+| Param       | Type     | Description        |
+| ----------- | -------- | ------------------ |
+| `projectId` | `string` | Source project id. |
+
+**Query params:**
+
+| Param  | Type     | Description                                                                                                                                       |
+| ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `path` | `string` | Optional. Directory prefix for browse mode (default `""`= root).                                                                                  |
+| `q`    | `string` | Optional. Non-empty free-text search query. When non-empty, activates search mode (returns flat file list). Absent or empty string → browse mode. |
+
+**Modes:**
+
+- **Browse mode** (`q` absent or `q=""`): returns files at the given `path` level plus folder summaries for immediate sub-directories. Folder `accessCounts` are computed from all descendants.
+- **Search mode** (`q` non-empty): returns a flat list of files whose `path` or `name` matches the query (case-insensitive). `folders` is omitted.
+
+**Response:** `200 ProjectTreeResponse` | `401 Unauthorized` | `404 project_not_found`
+
+```
+GET /v1/inventory/projects/proj-abc/tree?path=src
+Authorization: Bearer <token>
+```
+
+**Browse-mode response shape:**
+
+```json
+{
+  "project": {
+    "id": "proj-abc",
+    "name": "payments-api",
+    "visibility": "private",
+    "language": "TypeScript"
+  },
+  "path": "src",
+  "files": [
+    {
+      "path": "src/main.ts",
+      "name": "main.ts",
+      "origin": "source",
+      "access": "approved",
+      "isCustom": false,
+      "findings": 0
+    }
+  ],
+  "folders": [
+    {
+      "name": "config",
+      "path": "src/config",
+      "fileCount": 2,
+      "accessCounts": { "open": 0, "approved": 1, "blocked": 1 }
+    }
+  ]
+}
+```
+
+**Search-mode response shape** (`?q=aws`):
+
+```json
+{
+  "project": {
+    "id": "proj-abc",
+    "name": "payments-api",
+    "visibility": "private",
+    "language": "TypeScript"
+  },
+  "path": "",
+  "files": [
+    {
+      "path": "src/config/aws.ts",
+      "name": "aws.ts",
+      "origin": "config",
+      "access": "approved",
+      "isCustom": true,
+      "findings": 0
+    }
+  ]
+}
+```
+
+`isCustom` is `true` when a file-level access override exists AND differs from the computed default. `blockedAt` and `note` appear only when set.
+
+---
+
+### §7 — GET /v1/inventory/projects/:projectId/files
+
+Retrieve full detail for a single file within a connected source project.
+
+**Auth:** Bearer token required.  
+**Path params:**
+
+| Param       | Type     | Description        |
+| ----------- | -------- | ------------------ |
+| `projectId` | `string` | Source project id. |
+
+**Query params:**
+
+| Param  | Type     | Description                                                     |
+| ------ | -------- | --------------------------------------------------------------- |
+| `path` | `string` | Required. File path (e.g. `src/main.ts`). Empty string → `400`. |
+
+**Response:** `200 FileDetail` | `400 missing_path` | `401 Unauthorized` | `404 project_not_found` | `404 file_not_found`
+
+```
+GET /v1/inventory/projects/proj-abc/files?path=src%2Fmain.ts
+Authorization: Bearer <token>
+```
+
+**Response shape (`FileDetail`):**
+
+```json
+{
+  "path": "src/main.ts",
+  "name": "main.ts",
+  "origin": "source",
+  "defaultAccess": "approved",
+  "access": "approved",
+  "isCustom": false,
+  "findings": 0,
+  "findingsRefs": [],
+  "project": {
+    "id": "proj-abc",
+    "name": "payments-api",
+    "visibility": "private",
+    "language": "TypeScript",
+    "policyDefault": "approved",
+    "updatedAt": "2026-06-30T00:00:00.000Z"
+  }
+}
+```
+
+`findingsRefs` is always `[]` in this milestone (findings JOIN deferred to a future PR).  
+`blockedAt` (ISO 8601) and `note` appear only when set.
+
+---
+
+### §8 — PUT /v1/inventory/projects/:projectId/files/access
+
+Set (or clear) a per-file access override for a source project file. When the requested
+`access` value equals the file's computed default, the override is deleted (clear-on-default).
+
+**Auth:** Bearer token required. Requires a writable role (`owner`, `admin`, or `member`). `security_viewer` → `403 forbidden`.
+
+**Path params:**
+
+| Param       | Type     | Description        |
+| ----------- | -------- | ------------------ |
+| `projectId` | `string` | Source project id. |
+
+**Request body (`SetFileAccessBody`):**
+
+| Field    | Type                                | Description                     |
+| -------- | ----------------------------------- | ------------------------------- |
+| `path`   | `string`                            | File path within the project.   |
+| `access` | `"open" \| "approved" \| "blocked"` | Desired effective access level. |
+
+**Response:** `200 SetFileAccessResponse` | `400 VALIDATION_ERROR` | `401 Unauthorized` | `403 forbidden` | `404 project_not_found` | `404 file_not_found`
+
+```
+PUT /v1/inventory/projects/proj-abc/files/access
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "path": "src/main.ts", "access": "blocked" }
+```
+
+**Response shape (`SetFileAccessResponse`):**
+
+```json
+{
+  "file": {
+    "path": "src/main.ts",
+    "name": "main.ts",
+    "origin": "source",
+    "access": "blocked",
+    "isCustom": true,
+    "findings": 0
+  },
+  "accessCounts": {
+    "open": 3,
+    "approved": 1,
+    "blocked": 1,
+    "total": 5
+  }
+}
+```
+
+`isCustom` is `true` when the override differs from the computed default; `false` when the
+override was cleared (requested `access` matched the default).
+
+---
+
+### §9 — PUT /v1/inventory/assets/:assetId/trust
+
+Set (or clear) a per-asset MCP trust override. When the requested `trust` value equals the
+asset's base trust, the override is deleted (clear-on-default). Only applicable to assets
+with `type = "mcp"`.
+
+**Auth:** Bearer token required. Requires a writable role (`owner`, `admin`, or `member`). `security_viewer` → `403 forbidden`.
+
+**Path params:**
+
+| Param     | Type     | Description |
+| --------- | -------- | ----------- |
+| `assetId` | `string` | Asset id.   |
+
+**Request body (`SetMcpTrustBody`):**
+
+| Field   | Type                                      | Description          |
+| ------- | ----------------------------------------- | -------------------- |
+| `trust` | `"known-good" \| "risky" \| "unapproved"` | Desired trust level. |
+
+**Response:** `200 AssetDetail` | `400 VALIDATION_ERROR` | `400 not_an_mcp_server` | `401 Unauthorized` | `403 forbidden` | `404 asset_not_found`
+
+```
+PUT /v1/inventory/assets/asset-abc/trust
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "trust": "known-good" }
+```
+
+The response is the full `AssetDetail` shape (see §4). When `trust` is `"unapproved"`, all
+`tools[].risk` fields are non-null (populated with a default warning if not set in the source
+data). `isCustom` is implied by `effectiveTrust ≠ baseTrust`; the response does not include
+a separate flag.
+
+---
+
+### §10 — GET /v1/inventory/harnesses/:harnessId/events
+
+Returns enforcement events for a specific harness. Events are merged from two internal
+sources (legacy `findings+events` and new `inspection_findings+audit_events`), deduplicated
+on a per-second / action / file key (new-system row wins), sorted newest-first, and sliced
+to `limit`.
+
+**Auth:** Bearer token required.
+
+**Path params:**
+
+| Param       | Type     | Description                                                                          |
+| ----------- | -------- | ------------------------------------------------------------------------------------ |
+| `harnessId` | `string` | Harness identifier: `claudecode`, `cursor`, or `codex`. Unknown values return `404`. |
+
+**Query params:**
+
+| Param   | Type     | Default | Description                                                                          |
+| ------- | -------- | ------- | ------------------------------------------------------------------------------------ |
+| `limit` | `number` | `7`     | Maximum events to return. Range: 1–50. Validated by Zod — `0` or `>50` return `400`. |
+
+**Response:** `200 HarnessEventsResponse` | `400 VALIDATION_ERROR` | `401 Unauthorized` | `404 harness_not_found`
+
+```
+GET /v1/inventory/harnesses/claudecode/events?limit=20
+Authorization: Bearer <token>
+```
+
+**Response shape** (`HarnessEventsResponse`):
+
+| Field    | Type                                              | Description                                          |
+| -------- | ------------------------------------------------- | ---------------------------------------------------- |
+| `counts` | `{ block: number; redact: number; warn: number }` | Action-taken counts across the returned `items` only |
+| `items`  | `HarnessEventItem[]`                              | Events sorted DESC by `occurredAt`, sliced to limit  |
+
+**`HarnessEventItem` shape:**
+
+| Field        | Type                            | Description                        |
+| ------------ | ------------------------------- | ---------------------------------- |
+| `kind`       | `"block" \| "redact" \| "warn"` | Action taken on this event         |
+| `title`      | `string`                        | Category label (e.g. `"secret"`)   |
+| `detail`     | `string`                        | File path if available; `""`       |
+| `occurredAt` | `string` (ISO 8601)             | When the event occurred            |
+| `findingId`  | `string \| null` (optional)     | Source finding id for traceability |
+
+---
+
+### §11 — POST /v1/inventory/rescan
+
+Triggers an inventory rescan (stub implementation). Returns `202 Accepted` with a job id
+on the first call. Subsequent calls within the same process lifetime return `409 scan_in_progress`
+until the process restarts. This is a scaffolded endpoint — the actual rescan worker is not
+yet implemented.
+
+**Auth:** Bearer token required. Requires a writable role. `security_viewer` → `403 forbidden`.
+
+**Request body:** none
+
+**Response:** `202 RescanResponse` | `401 Unauthorized` | `403 forbidden` | `409 scan_in_progress`
+
+```
+POST /v1/inventory/rescan
+Authorization: Bearer <token>
+```
+
+**`202 RescanResponse` shape:**
+
+| Field       | Type                | Description                      |
+| ----------- | ------------------- | -------------------------------- |
+| `jobId`     | `string`            | Unique job identifier (`scan_…`) |
+| `startedAt` | `string` (ISO 8601) | When the scan was accepted       |
+
+---
+
+### §12 — POST /v1/inventory/projects
+
+Connects a new GitHub repository to the tenant's inventory. The `repo` body field must be
+in `owner/name` format (no leading slash, exactly one `/`). A `https://github.com/` URL is
+constructed server-side. Returns `409 project_exists` when a project with the same URL is
+already registered for the tenant.
+
+**Auth:** Bearer token required. Requires a writable role. `security_viewer` → `403 forbidden`.
+
+**Request body (`ConnectProjectBody`):**
+
+| Field  | Type     | Description                                 |
+| ------ | -------- | ------------------------------------------- |
+| `repo` | `string` | Repository in `owner/name` format (GitHub). |
+
+**Response:** `201 ProjectSummary` | `400 invalid_repo` | `401 Unauthorized` | `403 forbidden` | `409 project_exists`
+
+```
+POST /v1/inventory/projects
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "repo": "acme/payments-service" }
+```
+
+The response is the full `ProjectSummary` shape (see §5). Newly connected projects have
+zeroed `accessCounts` and `findingsCount` (no files seeded yet). `visibility` is coalesced
+to `"private"` and `policyDefault` to `"approved"` until updated.
+
+---
+
 ## Planned endpoints
 
 These endpoints are defined in `packages/schema/src/zod/api.ts` but not yet implemented:
 
-| Method | Path           | Description                          |
-| ------ | -------------- | ------------------------------------ |
-| `GET`  | `/v1/findings` | List detection findings with filters |
-| `PUT`  | `/v1/policies` | Update policy bundle                 |
+| Method | Path           | Description          |
+| ------ | -------------- | -------------------- |
+| `PUT`  | `/v1/policies` | Update policy bundle |
 
 Track progress in the GitHub issues.

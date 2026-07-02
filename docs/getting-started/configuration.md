@@ -1,6 +1,6 @@
 # Configuration
 
-AKA is configured entirely through environment variables. The `@aka/config` package validates them at startup — the server crashes with a complete error list if anything is missing or invalid, rather than failing silently later.
+AKA is configured entirely through environment variables. The `@alsoknownassecurity/config` package validates them at startup — the server crashes with a complete error list if anything is missing or invalid, rather than failing silently later.
 
 ## Modes
 

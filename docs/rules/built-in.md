@@ -162,10 +162,10 @@ Detects insecure code patterns across Python, JS/TS, Java, Ruby, PHP, and .NET. 
 ## Running the test suite
 
 ```bash
-pnpm --filter @aka/detections test
+pnpm --filter @alsoknownassecurity/detections test
 
 # Watch mode during rule development
-pnpm --filter @aka/detections test -- --watch
+pnpm --filter @alsoknownassecurity/detections test -- --watch
 ```
 
 Fixture tests auto-discover across all packs - no need to register new rules manually.

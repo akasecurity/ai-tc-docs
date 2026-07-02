@@ -203,7 +203,7 @@ Let's write a rule to detect Stripe secret keys (`sk_live_...`).
 **Step 4** — Run the tests:
 
 ```bash
-pnpm --filter @aka/detections test
+pnpm --filter @alsoknownassecurity/detections test
 ```
 
 The fixture-driven test auto-discovers your new rule and runs all fixtures. Fix until green.
