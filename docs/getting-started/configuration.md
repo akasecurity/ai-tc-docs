@@ -4,44 +4,54 @@ AKA is configured entirely through environment variables. The `@alsoknownassecur
 
 ## Modes
 
-The `MODE` variable selects which schema is validated and which features are enabled.
+The `MODE` variable selects which schema is validated and which features are
+enabled. The enterprise backend is **Postgres-only** (see [ADR: Postgres-only
+enterprise]); every non-`test` mode requires `DATABASE_URL`.
 
-| `MODE`        | Use case                                        |
-| ------------- | ----------------------------------------------- |
-| `local`       | Single developer, SQLite, no auth server needed |
-| `dev`         | Development team, Postgres, full stack          |
-| `hosted`      | Production SaaS multi-tenant                    |
-| `self-hosted` | Production single-tenant Docker deployment      |
-| `test`        | Vitest — uses in-memory SQLite, skips migration |
+| `MODE`        | Use case                                                    |
+| ------------- | ----------------------------------------------------------- |
+| `dev`         | Development team, Postgres, full stack                      |
+| `hosted`      | Production SaaS multi-tenant (Postgres)                     |
+| `self-hosted` | Production single-tenant Docker deployment (Postgres)       |
+| `test`        | Vitest — the integration suite runs against a real Postgres |
 
-## Storage drivers
+> Single-user / single-node with no server runs the **OSS stack** — the `aka` CLI
+> and web-ui read the local SQLite store via `@alsoknownassecurity/persistence`, not the
+> enterprise backend. See [Local / Single-Node](../deployment/local.md).
+
+## Storage driver
+
+The enterprise backend uses Postgres exclusively — Postgres is an infra dependency
+it connects to, not a bundled engine. `STORAGE_DRIVER=sqlite` is **rejected** for
+every non-`test` mode.
 
 | `STORAGE_DRIVER` | Driver               | Required vars  |
 | ---------------- | -------------------- | -------------- |
-| `sqlite`         | better-sqlite3       | `SQLITE_PATH`  |
 | `postgres`       | node-postgres (`pg`) | `DATABASE_URL` |
+
+(SQLite is used only by the OSS local store — `@alsoknownassecurity/persistence`, Node's
+`node:sqlite` — and by the rule registry service; neither is the enterprise API.)
 
 ## All variables
 
 ### Common (all modes)
 
-| Variable           | Default      | Description                                                           |
-| ------------------ | ------------ | --------------------------------------------------------------------- |
-| `NODE_ENV`         | `production` | Node environment: `development`, `test`, `production`                 |
-| `MODE`             | —            | **Required.** One of: `local`, `dev`, `hosted`, `self-hosted`, `test` |
-| `STORAGE_DRIVER`   | —            | **Required.** One of: `sqlite`, `postgres`                            |
-| `PORT`             | `4000`       | HTTP port the backend listens on                                      |
-| `HOST`             | `0.0.0.0`    | Interface to bind                                                     |
-| `LOG_LEVEL`        | `info`       | Pino log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace`    |
-| `MIGRATE_ON_START` | `false`      | Run pending migrations before accepting traffic                       |
-| `VERSION`          | `0.0.0`      | Injected by CI into the Docker image; appears in `/healthz`           |
+| Variable           | Default      | Description                                                         |
+| ------------------ | ------------ | ------------------------------------------------------------------- |
+| `NODE_ENV`         | `production` | Node environment: `development`, `test`, `production`               |
+| `MODE`             | `local`      | One of: `dev`, `hosted`, `self-hosted`, `test` (enterprise backend) |
+| `STORAGE_DRIVER`   | —            | **Required: `postgres`** for the enterprise backend                 |
+| `PORT`             | `4000`       | HTTP port the backend listens on                                    |
+| `HOST`             | `0.0.0.0`    | Interface to bind                                                   |
+| `LOG_LEVEL`        | `info`       | Pino log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace`  |
+| `MIGRATE_ON_START` | `false`      | Run pending migrations before accepting traffic                     |
+| `VERSION`          | `0.0.0`      | Injected by CI into the Docker image; appears in `/healthz`         |
 
-### SQLite mode (local/test only)
+### Test mode
 
-| Variable          | Default    | Description                                                                                                                                                                                        |
-| ----------------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `SQLITE_PATH`     | `./aka.db` | Filesystem path to the SQLite database file. Use `:memory:` for tests.                                                                                                                             |
-| `AKA_LOCAL_TOKEN` | —          | **Required for `MODE=local` and `MODE=test`.** Bearer token (min 16 chars) used as the auth token. Not used or accepted for `dev`/`hosted`/`self-hosted` modes — use Better Auth API keys instead. |
+| Variable          | Default | Description                                                                                                                                                                                   |
+| ----------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AKA_LOCAL_TOKEN` | —       | **Required for `MODE=test`.** Bearer token (min 16 chars) used as the auth token in the test harness. Not used or accepted for `dev`/`hosted`/`self-hosted` — those use Better Auth API keys. |
 
 ### Postgres mode
 
@@ -107,43 +117,19 @@ that same `aka.db`; an enterprise backend URL + token (Phase 2) live in
 
 ## Example configurations
 
-=== "Local SQLite"
-
-    ```bash
-    MODE=local
-    STORAGE_DRIVER=sqlite
-    SQLITE_PATH=./aka.db
-    AKA_LOCAL_TOKEN=mytoken1234567890
-    MIGRATE_ON_START=true
-    PORT=4000
-    LOG_LEVEL=info
-    ```
-
-=== "Plugin + local backend (shared DB)"
-
-    The opt-in "full experience": a backend over the plugin's own
-    `~/.aka/data/aka.db`. Migrations are **off** — the plugin owns the schema —
-    and the backend resolves its tenant from the row the plugin already seeded,
-    so its dashboards aren't empty over a populated DB. Brought up by
-    `docker/docker-compose.local.yml`.
-
-    ```bash
-    MODE=local
-    STORAGE_DRIVER=sqlite
-    SQLITE_PATH=/data/aka.db        # ~/.aka/data mounted at /data
-    MIGRATE_ON_START=false          # plugin owns migrations
-    AKA_LOCAL_TOKEN=mytoken1234567890
-    PORT=7878
-    ```
+> Single-user with no server? Don't configure the backend at all — run the OSS
+> stack (the `aka` CLI + web-ui read `~/.aka/data/aka.db` directly). See
+> [Local / Single-Node](../deployment/local.md).
 
 === "Docker dev (Postgres)"
 
     ```bash
     MODE=dev
     STORAGE_DRIVER=postgres
-    # Connect as the non-superuser runtime role so FORCE RLS is active.
-    # The owner role (aka) is used only for migrations, never for runtime queries.
+    # Runtime role: the non-superuser aka_app so FORCE RLS is active.
     DATABASE_URL=postgresql://aka_app:akaapppw@postgres:5432/aka
+    # Owner role: migrations only (MIGRATE_ON_START), never runtime queries.
+    ADMIN_DATABASE_URL=postgresql://aka:akadev@postgres:5432/aka
     # Better Auth required for non-local modes — generate a secret with: openssl rand -hex 32
     BETTER_AUTH_SECRET=<generate-with-openssl-rand-hex-32>
     BETTER_AUTH_URL=http://localhost:4000
@@ -157,7 +143,8 @@ that same `aka.db`; an enterprise backend URL + token (Phase 2) live in
     ```bash
     MODE=self-hosted
     STORAGE_DRIVER=postgres
-    DATABASE_URL=postgresql://user:secret@db.internal:5432/aka
+    DATABASE_URL=postgresql://aka_app:[REDACTED:PII]:5432/aka
+    ADMIN_DATABASE_URL=postgresql://aka:[REDACTED:PII]:5432/aka
     BETTER_AUTH_SECRET=<generate-with-openssl-rand-hex-32>
     BETTER_AUTH_URL=https://api.yourhost.com
     PORT=4000
@@ -173,7 +160,7 @@ openssl rand -hex 32
 # → a3f8c2e7d1b9456f0e2a8c4d6b3e7f1a2c5d8e9b0f3a6c9d2e5f8b1c4d7e0f3
 ```
 
-Use the output as `BETTER_AUTH_SECRET` (non-local modes) or `AKA_LOCAL_TOKEN` (local/test modes).
+Use the output as `BETTER_AUTH_SECRET` (`dev`/`hosted`/`self-hosted`) or `AKA_LOCAL_TOKEN` (`test`).
 
 For local mode, `AKA_LOCAL_TOKEN` must be the same value set in both the backend and the Claude Code plugin environment.
 

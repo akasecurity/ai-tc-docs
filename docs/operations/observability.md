@@ -12,7 +12,7 @@ Every service emits **OTLP** to an **OpenTelemetry Collector**. The collector is
                                        ▼
         backend / registry (Fastify)  ──OTLP──►  OpenTelemetry Collector
         • auto: http, fastify, pg                 ├─► Jaeger        (traces)
-        • manual: db (sqlite+pg), auth            ├─► Prometheus    (metrics)
+        • manual: db (postgres), auth             ├─► Prometheus    (metrics)
         • /metrics, /healthz/live, /healthz/ready ├─► CloudWatch/X-Ray (optional)
                                                   └─► Azure Monitor   (optional)
 ```
@@ -20,7 +20,7 @@ Every service emits **OTLP** to an **OpenTelemetry Collector**. The collector is
 ## What is instrumented
 
 - **HTTP, Fastify, and Postgres** via OpenTelemetry auto-instrumentation.
-- **Database queries** (both SQLite and Postgres) via an explicit `db.query` span + duration metric at the single tenant-scope chokepoint every repository call flows through — SQLite has no auto-instrumentation, so this is its only DB visibility.
+- **Database queries** (Postgres) via an explicit `db.query` span + duration metric at the single tenant-scope chokepoint every repository call flows through.
 - **Auth** — `verifyApiKey`, `getSession`, and tenant resolution each get a span.
 - **Outgoing calls** — `@alsoknownassecurity/client` injects W3C `traceparent`/`tracestate`/`baggage` and a correlation id on every backend→registry and plugin→backend request, so a trace spans the whole chain.
 

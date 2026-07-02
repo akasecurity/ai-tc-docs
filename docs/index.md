@@ -48,17 +48,17 @@ The stack is a TypeScript-strict pnpm monorepo:
 
 ## Quick start
 
-=== "Local (no Docker)"
+=== "OSS single-node (no server)"
+
+    The plugin + `aka` CLI write a local SQLite store (`~/.aka/data/aka.db`) and
+    the OSS web-ui reads it directly — no backend, no Postgres, no account.
 
     ```bash
     git clone https://github.com/your-org/ai-control-plane
     cd ai-control-plane
     pnpm setup
 
-    MODE=local STORAGE_DRIVER=sqlite \
-      AKA_LOCAL_TOKEN=mytoken1234567890 \
-      MIGRATE_ON_START=true \
-      pnpm --filter @alsoknownassecurity/backend dev
+    aka dashboard   # OSS web-ui over ~/.aka/data
     ```
 
 === "Docker"

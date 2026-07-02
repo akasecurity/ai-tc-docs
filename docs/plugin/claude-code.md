@@ -152,34 +152,20 @@ Unconfigured is a valid state: until `/aka:setup` runs, detection still uses the
 
 > **Enterprise (Phase 2).** A backend URL + bearer token live in a separate `~/.aka/settings/config.json` and gate remote sync. The local-first flow above does not ask for either — they are not part of `/aka:setup` today. The `token` carries an `AKA_LOCAL_TOKEN` (sent as `Authorization: Bearer`) in `local`/`test` modes, or a Better Auth API key (sent as `x-api-key`) in `dev`/`hosted`/`self-hosted` modes; see [Minting an API key](../api/reference.md#minting-an-api-key) in the API reference.
 
-## Plugin + local backend over the shared file (optional)
+## Reading your local data (standalone)
 
-A local backend can read and serve the **same** `~/.aka/data/aka.db` that the
-**standalone** plugin writes — web dashboards plus a policy engine over your
-local data, with nothing leaving the machine. This file-sharing setup runs
-alongside `runMode: standalone`: the plugin keeps reading/writing the SQLite file
-directly, and the backend reads it. Bring it up with the dedicated compose file:
-
-```bash
-# host needs this repo cloned; reads ~/.aka/data/aka.db
-AKA_LOCAL_TOKEN=$(openssl rand -hex 16) \
-  docker compose -f docker/docker-compose.local.yml up
-# dashboard → http://localhost:5173   ·   backend/API → http://localhost:7878
-```
-
-Two properties keep the shared file safe:
-
-- **Migrations are off** (`MIGRATE_ON_START=false`) — the plugin owns the schema and self-migrates on open, so there is no dual-migrator race. The writers are disjoint: the plugin writes `events`/`findings`, the backend writes `policies`, and WAL lets both share the file.
-- **The backend adopts the plugin's identity** — in `local` mode it resolves its tenant from the single existing `tenants` row (the UUID the plugin seeded) instead of a hardcoded stub, so dashboards render over the populated DB rather than an empty stub tenant.
-
-Run the plugin at least once before starting the stack so `~/.aka/data` exists and is owned by you. Toggling a policy in the dashboard is picked up by the standalone plugin's next run via the shared `policies` table.
+The **standalone** plugin writes `~/.aka/data/aka.db` and the OSS web dashboard
+reads that same store directly (`@alsoknownassecurity/persistence`, Server Components) — web
+dashboards over your local data with nothing leaving the machine and no server to
+run. Launch it with `aka dashboard` (see the [CLI](../getting-started/cli.md) and
+[Local / Single-Node](../deployment/local.md)).
 
 > **`attached` is a different topology.** Setting `runMode: attached` points the
-> plugin at a backend over its **HTTP API** (events via ingest, reads + the
-> policy bundle via the API) rather than the shared file — for when the backend,
-> not the local file, is the source of truth. The file-sharing setup above keeps
-> the plugin in `standalone`. Reconciling the two (which compose topology backs
-> `attached`) is tracked separately.
+> plugin at the enterprise backend over its **HTTP API** (events via ingest,
+> reads + the policy bundle via the API) — for when the hosted control plane, not
+> the local file, is the source of truth. The enterprise backend is Postgres-only;
+> there is no shared-SQLite-file topology (the plugin's local store is OSS SQLite,
+> the backend is Postgres — they sync over HTTP, not a shared file).
 
 ## Installing, developing, and testing
 

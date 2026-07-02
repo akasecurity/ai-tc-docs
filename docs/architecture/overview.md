@@ -28,9 +28,8 @@ ai-control-plane/
 │   └── write-detection-rule/SKILL.md
 └── docker/
     ├── Dockerfile
-    ├── docker-compose.yml        (prod / self-hosted)
-    ├── docker-compose.dev.yml    (dev)
-    └── docker-compose.local.yml  (plugin + local backend over ~/.aka/data)
+    ├── docker-compose.yml        (prod / self-hosted — app + Postgres)
+    └── docker-compose.dev.yml    (dev — Postgres + backend + dashboard + docs)
 ```
 
 ## Package dependency rules
@@ -79,25 +78,15 @@ tool-specific adapter, never a copy of the storage/detection logic.
                                                       ▼
         ~/.aka/data/aka.db   (events · findings · policies)   ◀── shared by all plugins
                 ▲                                   ▲
-   (optional) local backend (Docker)        (Phase 2) enterprise sync
-   dashboards + policy engine, SAME DB        tenant-less wire → Org API
+   OSS web-ui reads it directly            (Phase 2) enterprise sync
+   (@alsoknownassecurity/persistence, no server)       tenant-less wire → Postgres backend (HTTP)
 ```
 
-A user may **opt in** to "Plugin + local backend" (`docker/docker-compose.local.yml`):
-the backend and dashboard read/serve that **same** `aka.db`. Two seams make the
-shared file safe:
-
-- **Migration ownership.** The plugin owns the schema and self-migrates on open,
-  so the backend runs `MIGRATE_ON_START=false` — no dual-migrator race. The
-  writers are disjoint (plugin → `events`/`findings`, backend → `policies`) and
-  WAL lets both share the file.
-- **Identity.** The plugin seeds one tenant/user with a **generated UUID** on
-  first run. In `local` mode the backend resolves its tenant from that existing
-  row (not a hardcoded stub), so its dashboards aren't empty over a
-  plugin-populated DB. Phase-2 org-connect rebinds the identity to org-issued ids.
-
-Enterprise auth and remote sync are **Phase 2**; in Phase 1 nothing leaves the
-machine.
+For web dashboards over local data with no server, the **OSS web-ui** reads that
+same `aka.db` directly (`@alsoknownassecurity/persistence`, Server Components) — there is no
+local _enterprise backend_. The enterprise backend is Postgres-only (see
+[Postgres-only enterprise]); the plugin syncs to it over HTTP in `attached` mode
+(Phase 2), never over a shared SQLite file. In Phase 1 nothing leaves the machine.
 
 ## Data flow
 
@@ -159,9 +148,9 @@ The dashboard is a React SPA that calls the backend's REST API via TanStack Quer
    of truth          (backend + registry)        options, sole fetch caller
 ```
 
-`packages/client/gen/dump-specs.ts` boots each Fastify app to `ready()` against an
-in-memory SQLite DB and writes `app.swagger()` to `packages/client/openapi/*.json`
-(no server, no real DB). [Hey API](https://heyapi.dev) (`@hey-api/openapi-ts`) then
+`packages/client/gen/dump-specs.ts` boots each Fastify app to `ready()` against a
+never-connected Postgres config and writes `app.swagger()` to
+`packages/client/openapi/*.json` (route registration only — no server, no real DB). [Hey API](https://heyapi.dev) (`@hey-api/openapi-ts`) then
 generates `packages/client/src/generated/**` — **types only**, no runtime
 validation, since the server already validates and the types derive from the same
 Zod contracts. A thin hand-written wrapper (`src/index.ts`) keeps the stable public
@@ -205,14 +194,14 @@ Response
 
 The Drizzle schema lives in `packages/schema/src/drizzle/` and is split into two logical groups:
 
-| Group       | Tables                                                                                                                                              | File pair                                  |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| **Catalog** | `tenants`, `users`                                                                                                                                  | `catalog/sqlite.ts`, `catalog/postgres.ts` |
-| **Tenant**  | `events`, `findings`, `policies`, `inventory`, `source_project`, `audit_events`, `classified_data`, `inspection_definitions`, `inspection_findings` | `tenant/sqlite.ts`, `tenant/postgres.ts`   |
+| Group       | Tables                                                                                                                                              | File                  |
+| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| **Catalog** | `tenants`, `users`                                                                                                                                  | `catalog/postgres.ts` |
+| **Tenant**  | `events`, `findings`, `policies`, `inventory`, `source_project`, `audit_events`, `classified_data`, `inspection_definitions`, `inspection_findings` | `tenant/postgres.ts`  |
 
-The catalog tables are cross-tenant metadata (no row-level security on either dialect). The tenant tables hold per-tenant operational data and are protected by RLS on Postgres.
+The catalog tables are cross-tenant metadata (no row-level security). The tenant tables hold per-tenant operational data and are protected by FORCE RLS. The enterprise schema is Postgres-only (ADR: Postgres-only enterprise); the tenant-free OSS local store (SQLite) lives separately in `@alsoknownassecurity/schema` (`drizzle/local/sqlite.ts`).
 
-The combined runtime objects `sqliteSchema` / `pgSchema` (exported from `@alsoknownassecurity/schema/drizzle`) spread both groups together and are used as the drizzle client's `{ schema }` argument.
+The combined runtime object `pgSchema` (exported from `@alsoknownassecurity/schema-enterprise/drizzle`) spreads both groups together and is used as the drizzle client's `{ schema }` argument. A base→extended row contract (`Base*Row` in `@alsoknownassecurity/schema` → `Tenant*Row` in `@alsoknownassecurity/schema-enterprise`) plus invariant `.test.ts` guards keep the OSS SQLite tables and the enterprise Postgres tables from diverging.
 
 | Table      | Purpose                                                     |
 | ---------- | ----------------------------------------------------------- |
@@ -269,7 +258,7 @@ Zod(ISO) ← repo
 
 ### Row-level security (Postgres only)
 
-Every tenant table (`events`, `findings`, `policies`, and the generalized data-model tables `inventory`, `source_project`, `audit_events`, `classified_data`, `inspection_definitions`, `inspection_findings`) declares `ENABLE ROW LEVEL SECURITY` and a single permissive policy keyed on `current_setting('app.tenant_id', true)` in the Postgres dialect. The SQLite tables have no RLS declarations (single-tenant local mode).
+Every tenant table (`events`, `findings`, `policies`, and the generalized data-model tables `inventory`, `source_project`, `audit_events`, `classified_data`, `inspection_definitions`, `inspection_findings`) declares `ENABLE ROW LEVEL SECURITY` and a single permissive policy keyed on `current_setting('app.tenant_id', true)` — the enterprise schema is Postgres-only, and FORCE RLS is applied via companion migrations. (The OSS local store in `@alsoknownassecurity/schema` is single-tenant SQLite with no RLS.)
 
 The generated migration (`drizzle/postgres/0000_*.sql`) contains:
 
@@ -279,7 +268,7 @@ The generated migration (`drizzle/postgres/0000_*.sql`) contains:
 
 **FORCE ROW LEVEL SECURITY companion:** drizzle-kit 0.31 emits `ENABLE ROW LEVEL SECURITY` and `CREATE POLICY` but NOT `FORCE ROW LEVEL SECURITY`. Without FORCE, the table owner role bypasses RLS entirely. FORCE is added by **journaled custom migrations** (e.g. `drizzle/postgres/0001_force_rls.sql`, and `0010_force_rls_meta_data_model.sql` for the generalized data-model tables), recorded in `meta/_journal.json` and applied by the standard drizzle-orm migrator after the table-creating migration they accompany. These are the only hand-written SQL files in the project. (Note: a plain file sorted by name — e.g. a `9999_*.sql` — would NOT be applied, because the migrator reads the journal, not the directory listing.) When drizzle-kit gains native FORCE RLS support, this migration should be removed and `0000_initial` regenerated.
 
-**Per-request tenant context.** `withTenantContext` opens a transaction and issues `set_config('app.tenant_id', $1, true)` (tenantId bound, never interpolated) so Postgres FORCE RLS resolves the active tenant; SQLite is a passthrough. Routes never call it directly. A **tenant-scope plugin** (`apps/backend/src/plugins/tenant-scope.ts`) decorates each request with `req.tenantScope` — an `open` `TenantScope` bound to that request's tenant — and repositories open their own context from it via `runInScope`. Isolation therefore lives in the data layer: a route cannot reach the database without RLS in force, because the only db-bearing value it can touch is the scope (typed `TenantScope | null`, narrowed by `requireTenantScope` which throws loudly rather than allow an un-scoped query). For work that must be atomic across several repository calls, `withTenantTransaction` opens one transaction and yields a `joined` scope shared by every call, so they commit or roll back together.
+**Per-request tenant context.** `withTenantContext` opens a transaction and issues `set_config('app.tenant_id', $1, true)` (tenantId bound, never interpolated) so Postgres FORCE RLS resolves the active tenant. Routes never call it directly. A **tenant-scope plugin** (`apps/backend/src/plugins/tenant-scope.ts`) decorates each request with `req.tenantScope` — an `open` `TenantScope` bound to that request's tenant — and repositories open their own context from it via `runInScope`. Isolation therefore lives in the data layer: a route cannot reach the database without RLS in force, because the only db-bearing value it can touch is the scope (typed `TenantScope | null`, narrowed by `requireTenantScope` which throws loudly rather than allow an un-scoped query). For work that must be atomic across several repository calls, `withTenantTransaction` opens one transaction and yields a `joined` scope shared by every call, so they commit or roll back together.
 
 ## Multi-tenancy (stub)
 
@@ -290,7 +279,7 @@ The current auth hook is a single-user bearer token stub. Real multi-tenancy (Be
 The system is instrumented with OpenTelemetry for distributed tracing, metrics, and trace-correlated logs, following CNCF conventions. It is **off by default and zero-cost when disabled** (`OTEL_ENABLED=false`): the SDK is loaded via a `node --import` preload that returns before importing any `@opentelemetry/*` code unless enabled, and hot-path code (the DB span wrapper, outgoing header injection) short-circuits on a boolean.
 
 - **Collector-centric.** Apps only ever emit OTLP to an OpenTelemetry Collector, which fans out to Jaeger (traces) + Prometheus (metrics) by default, or to AWS CloudWatch/X-Ray or Azure Monitor by collector config alone — vendor choice never touches app code.
-- **Coverage.** HTTP/Fastify/Postgres via auto-instrumentation; an explicit `db.query` span + metric at the `runInScope` chokepoint covers SQLite (no auto-instrumentation) and Postgres; auth lookups get spans. `@alsoknownassecurity/client` injects W3C `traceparent` + a correlation id on every outgoing call, so plugin→backend→DB→registry is one trace.
+- **Coverage.** HTTP/Fastify/Postgres via auto-instrumentation; an explicit `db.query` span + metric at the `runInScope` chokepoint covers every Postgres query; auth lookups get spans. `@alsoknownassecurity/client` injects W3C `traceparent` + a correlation id on every outgoing call, so plugin→backend→DB→registry is one trace.
 - **Correlation.** Every request reuses/echoes `x-request-id` (the trace id when present) and every log line carries `trace_id`/`span_id`.
 - **Probes.** `/healthz/live` is a dependency-free liveness check; `/healthz/ready` is dependency-aware readiness (`503` when the DB ping fails). Both are always available regardless of `OTEL_ENABLED`.
 
@@ -298,6 +287,6 @@ Implementation lives in `@alsoknownassecurity/telemetry` (shared SDK bootstrap) 
 
 ## Follow-ups (known gaps)
 
-**Dialect-explicit schema type aliases:** the former `CatalogSchema`/`TenantSchema` aliases were SQLite-typed only, so a Postgres handle had no type to describe it. They are replaced by dialect-explicit aliases in `@alsoknownassecurity/schema/drizzle`: `SqliteSchema`/`PgSchema` (the full combined handles) and the logical seams `SqliteCatalogSchema`, `SqliteTenantSchema`, `PgCatalogSchema`, `PgTenantSchema`. Each is derived with `Pick<...>` over the runtime `sqliteSchema`/`pgSchema` objects, so the types cannot drift from what `drizzle()` actually receives — a misspelled or removed table is a compile error, and new tables are tracked automatically. The dialect is part of the name because a Postgres table is not assignable to a SQLite one. Locked by type-level assertions in `packages/schema/src/drizzle/schema-types.test.ts` (enforced by `tsc --noEmit`).
+**Schema type aliases:** the enterprise schema (`@alsoknownassecurity/schema-enterprise/drizzle`) exports `PgSchema` (the full combined handle) and the logical seams `PgCatalogSchema` / `PgTenantSchema`, each derived with `Pick<...>` over the runtime `pgSchema` object, so the types cannot drift from what `drizzle()` receives — a misspelled or removed table is a compile error. Cross-dialect divergence between the OSS SQLite store and the enterprise Postgres tables is caught by the base→extended row-contract guards (`packages/schema-enterprise/src/drizzle/adherence.test.ts` and its OSS counterpart), enforced by `tsc --noEmit` + `vitest`.
 
 **Server-derived `findings.tenantId`:** `tenantId` is **server-derived** — injected from the authenticated context, never accepted from a request body. `packages/schema/src/zod/finding.ts` now mirrors the events pattern: the full `Finding` row schema carries `tenantId` (restoring Zod↔Drizzle parity with `findings.tenant_id`), and `DetectedFinding = Finding.omit({ tenantId: true })` is the producer-side shape. The future findings repository injects `tenantId` from the tenant scope on write — exactly as `insertEvents(scope, batch, userId)` reads `scope.tenantId` for `IngestEvent` — giving a single source of truth that lines up with the Postgres RLS `WITH CHECK (tenant_id = current_setting('app.tenant_id'))`. Decision locked by `packages/schema/src/zod/finding.test.ts`.
