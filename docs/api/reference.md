@@ -183,6 +183,8 @@ curl http://localhost:9464/metrics
 
 Ingest a batch of events. Deduplicates by `event.id` — re-sending the same ID is safe and returns `duplicates: 1`.
 
+For re-runnable bulk ingest (the worktree scan, the transcript backfill), set the optional batch-level `"dedupe": "content-hash"`: an event whose `contentHash` the tenant has already recorded is then also counted as a duplicate, so a re-run that mints fresh event ids for identical content doesn't accumulate duplicate events and findings. Live hook traffic must **not** set it — two genuinely separate but identical prompts both belong on the timeline.
+
 **Request body:**
 
 ```json
@@ -204,21 +206,29 @@ Ingest a batch of events. Deduplicates by `event.id` — re-sending the same ID 
 }
 ```
 
+**Batch fields:**
+
+| Field    | Type  | Required | Description                                                        |
+| -------- | ----- | -------- | ------------------------------------------------------------------ |
+| `events` | array | Yes      | 1–100 events                                                       |
+| `dedupe` | enum  | No       | `"content-hash"` — also reject events whose hash is already stored |
+
 **Event fields:**
 
-| Field                | Type     | Required | Description                                   |
-| -------------------- | -------- | -------- | --------------------------------------------- |
-| `id`                 | UUID     | Yes      | Client-generated idempotency key              |
-| `sourceTool`         | string   | Yes      | `"claude-code"`, `"cursor"`, etc.             |
-| `kind`               | enum     | Yes      | `"prompt"` \| `"response"` \| `"code_change"` |
-| `occurredAt`         | ISO 8601 | Yes      | When the event happened                       |
-| `contentHash`        | string   | Yes      | Hash of the content for deduplication         |
-| `content`            | string   | Yes      | Full text of the prompt/response              |
-| `metadata`           | object   | No       | Arbitrary key-value pairs                     |
-| `metadata.sessionId` | string   | No       | Claude session identifier                     |
-| `metadata.model`     | string   | No       | AI model used                                 |
-| `metadata.repo`      | string   | No       | Repository name                               |
-| `metadata.filePath`  | string   | No       | File being edited                             |
+| Field                 | Type     | Required | Description                                                                     |
+| --------------------- | -------- | -------- | ------------------------------------------------------------------------------- |
+| `id`                  | UUID     | Yes      | Client-generated idempotency key                                                |
+| `sourceTool`          | string   | Yes      | `"claude-code"`, `"cursor"`, etc.                                               |
+| `kind`                | enum     | Yes      | `"prompt"` \| `"response"` \| `"code_change"`                                   |
+| `occurredAt`          | ISO 8601 | Yes      | When the event happened                                                         |
+| `contentHash`         | string   | Yes      | Hash of the content for deduplication                                           |
+| `content`             | string   | Yes      | Full text of the prompt/response                                                |
+| `metadata`            | object   | No       | Arbitrary key-value pairs                                                       |
+| `metadata.sessionId`  | string   | No       | Claude session identifier                                                       |
+| `metadata.model`      | string   | No       | AI model used                                                                   |
+| `metadata.repo`       | string   | No       | Repository name                                                                 |
+| `metadata.filePath`   | string   | No       | File being edited                                                               |
+| `metadata.gitignored` | boolean  | No       | Scan provenance: file was excluded by `.gitignore` (findings are informational) |
 
 **Response `200 OK`:**
 
