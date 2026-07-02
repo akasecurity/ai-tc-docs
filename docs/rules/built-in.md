@@ -130,7 +130,8 @@ Detects insecure code patterns across Python, JS/TS, Java, Ruby, PHP, and .NET. 
 
 | Rule ID                     | Severity | Matcher | Description                                                                                     |
 | --------------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------- |
-| `sql-inject-concat`         | high     | regex   | SQL queries built with string concatenation (`+` or `.`)                                        |
+| `sql-inject-concat`         | high     | regex   | SQL queries built with `+` string concatenation                                                 |
+| `sql-inject-concat-dot`     | high     | regex   | SQL queries built with PHP `.` string concatenation (PHP files only)                            |
 | `sql-inject-format`         | high     | regex   | SQL queries via Python `%` format or f-strings                                                  |
 | `sql-inject-interp`         | high     | regex   | SQL queries via Ruby `#{}` or PHP `$var` interpolation                                          |
 | `cmd-inject-shell`          | critical | regex   | `subprocess.*shell=True` near user-controlled input                                             |
