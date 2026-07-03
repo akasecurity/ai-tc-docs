@@ -19,18 +19,22 @@ requires `DATABASE_URL`.
 > and web-ui read the local SQLite store via `@alsoknownassecurity/persistence`, not the
 > enterprise backend. See [Local / Single-Node](../deployment/local.md).
 
-## Storage driver
+## Storage
 
 The enterprise backend uses Postgres exclusively — Postgres is an infra dependency
 it connects to, not a bundled engine. The SQLite storage path was removed from the
-enterprise API, so **`STORAGE_DRIVER=postgres` is required** for every non-`test`
-mode; the backend has no SQLite repositories to fall back on. (Config-level
-validation still defaults `STORAGE_DRIVER` to `sqlite` for the OSS tooling — set it
-explicitly to `postgres` when running the enterprise backend.)
+enterprise API, so there is no driver to choose. What makes Postgres mandatory is
+the **required `DATABASE_URL`**: every non-`test` mode is validated against the
+Postgres config schema, and the backend crashes at startup if `DATABASE_URL` is
+missing.
 
-| `STORAGE_DRIVER` | Driver               | Required vars  |
-| ---------------- | -------------------- | -------------- |
-| `postgres`       | node-postgres (`pg`) | `DATABASE_URL` |
+| Mode       | Required vars                                                        |
+| ---------- | -------------------------------------------------------------------- |
+| non-`test` | `DATABASE_URL` (+ `ADMIN_DATABASE_URL` when `MIGRATE_ON_START=true`) |
+
+> The legacy `STORAGE_DRIVER` variable is **not read by the enterprise backend** —
+> it no longer selects a driver. It still defaults to `sqlite` for OSS tooling, but
+> you do not need to set it to run the enterprise API.
 
 (SQLite is used only by the OSS local store — `@alsoknownassecurity/persistence`, Node's
 `node:sqlite` — and by the rule registry service; neither is the enterprise API.)
@@ -39,16 +43,16 @@ explicitly to `postgres` when running the enterprise backend.)
 
 ### Common (all modes)
 
-| Variable           | Default      | Description                                                        |
-| ------------------ | ------------ | ------------------------------------------------------------------ |
-| `NODE_ENV`         | `production` | Node environment: `development`, `test`, `production`              |
-| `MODE`             | `local`      | One of: `local` (default), `dev`, `hosted`, `self-hosted`, `test`  |
-| `STORAGE_DRIVER`   | —            | **Required: `postgres`** for the enterprise backend                |
-| `PORT`             | `4000`       | HTTP port the backend listens on                                   |
-| `HOST`             | `0.0.0.0`    | Interface to bind                                                  |
-| `LOG_LEVEL`        | `info`       | Pino log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace` |
-| `MIGRATE_ON_START` | `false`      | Run pending migrations before accepting traffic                    |
-| `VERSION`          | `0.0.0`      | Injected by CI into the Docker image; appears in `/healthz`        |
+| Variable           | Default      | Description                                                                              |
+| ------------------ | ------------ | ---------------------------------------------------------------------------------------- |
+| `NODE_ENV`         | `production` | Node environment: `development`, `test`, `production`                                    |
+| `MODE`             | `local`      | One of: `local` (default), `dev`, `hosted`, `self-hosted`, `test`                        |
+| `STORAGE_DRIVER`   | `sqlite`     | Legacy; **not read by the enterprise backend** (Postgres is enforced via `DATABASE_URL`) |
+| `PORT`             | `4000`       | HTTP port the backend listens on                                                         |
+| `HOST`             | `0.0.0.0`    | Interface to bind                                                                        |
+| `LOG_LEVEL`        | `info`       | Pino log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace`                       |
+| `MIGRATE_ON_START` | `false`      | Run pending migrations before accepting traffic                                          |
+| `VERSION`          | `0.0.0`      | Injected by CI into the Docker image; appears in `/healthz`                              |
 
 ### Test mode
 
@@ -127,9 +131,7 @@ that same `aka.db`; an enterprise backend URL + token (Phase 2) live in
 === "Docker dev (Postgres)"
 
     ```bash
-    MODE=dev
-    STORAGE_DRIVER=postgres
-    # Runtime role: the non-superuser aka_app so FORCE RLS is active.
+    MODE=dev    # Runtime role: the non-superuser aka_app so FORCE RLS is active.
     DATABASE_URL=postgresql://aka_app:akaapppw@postgres:5432/aka
     # Owner role: migrations only (MIGRATE_ON_START), never runtime queries.
     ADMIN_DATABASE_URL=postgresql://aka:akadev@postgres:5432/aka
@@ -144,9 +146,7 @@ that same `aka.db`; an enterprise backend URL + token (Phase 2) live in
 === "Production self-hosted"
 
     ```bash
-    MODE=self-hosted
-    STORAGE_DRIVER=postgres
-    DATABASE_URL=postgresql://aka_app:<password>@db.internal:5432/aka
+    MODE=self-hosted    DATABASE_URL=postgresql://aka_app:<password>@db.internal:5432/aka
     ADMIN_DATABASE_URL=postgresql://aka:<password>@db.internal:5432/aka
     BETTER_AUTH_SECRET=<generate-with-openssl-rand-hex-32>
     BETTER_AUTH_URL=https://api.yourhost.com

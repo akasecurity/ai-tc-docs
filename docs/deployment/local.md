@@ -43,7 +43,6 @@ To run the backend directly against a Postgres you provide:
 
 ```bash
 MODE=dev \
-  STORAGE_DRIVER=postgres \
   DATABASE_URL=postgresql://aka_app:akaapppw@localhost:5432/aka \
   ADMIN_DATABASE_URL=postgresql://aka:akadev@localhost:5432/aka \
   MIGRATE_ON_START=true \
@@ -53,8 +52,9 @@ MODE=dev \
 ```
 
 > The enterprise backend no longer supports SQLite — the SQLite storage path was
-> removed from the enterprise API, so set `STORAGE_DRIVER=postgres` for every
-> non-`test` mode (the backend has no SQLite repositories to fall back on).
+> removed from the enterprise API. Postgres is mandatory because every non-`test`
+> mode requires `DATABASE_URL` (the legacy `STORAGE_DRIVER` variable is no longer
+> read by the backend).
 
 ## Applying migrations manually
 

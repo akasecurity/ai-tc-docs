@@ -67,7 +67,6 @@ docker run -d \
   --name aka \
   -p 4000:4000 \
   -e MODE=self-hosted \
-  -e STORAGE_DRIVER=postgres \
   -e DATABASE_URL=postgresql://user:pass@db:5432/aka \
   -e AKA_LOCAL_TOKEN=$(openssl rand -hex 32) \
   -e MIGRATE_ON_START=true \
@@ -108,7 +107,6 @@ Create a `.env` file for production secrets (do not commit this):
 ```bash
 # .env (gitignored)
 MODE=self-hosted
-STORAGE_DRIVER=postgres
 DATABASE_URL=postgresql://aka:supersecret@db:5432/aka
 # Required — the app refuses to start without these.
 BETTER_AUTH_SECRET=<output of: openssl rand -hex 32>   # ≥32 chars
