@@ -52,23 +52,26 @@ MODE=dev \
   pnpm --filter @alsoknownassecurity/backend dev
 ```
 
-> The enterprise backend no longer supports SQLite (see
-> [ADR: Postgres-only enterprise]). `STORAGE_DRIVER=sqlite` is rejected for every
-> non-test mode.
+> The enterprise backend no longer supports SQLite — the SQLite storage path was
+> removed from the enterprise API, so set `STORAGE_DRIVER=postgres` for every
+> non-`test` mode (the backend has no SQLite repositories to fall back on).
 
 ## Applying migrations manually
 
+Apply the Postgres schema migrations via the backend's `migrate:pg` script (it
+runs the migrator through `tsx`):
+
 ```bash
-pnpm --filter @alsoknownassecurity/migrator start -- postgres \
-  --url "$ADMIN_DATABASE_URL" \
-  --migrations-dir apps/backend/drizzle/postgres
+ADMIN_DATABASE_URL="$ADMIN_DATABASE_URL" \
+  pnpm --filter @alsoknownassecurity/backend migrate:pg
 ```
 
 Upgrading an existing self-hosted install that still runs on the old SQLite image?
-Use the one-shot data migration first:
+Run the one-shot data migration first (the `aka-migrate` bin ships with the
+published package; from a repo checkout run its source through `tsx`):
 
 ```bash
-pnpm --filter @alsoknownassecurity/migrator start -- data-sqlite-to-postgres \
+pnpm exec tsx tools/migrator/src/cli.ts data-sqlite-to-postgres \
   --db-path /app/data/aka.db \
   --url "$ADMIN_DATABASE_URL"
 ```

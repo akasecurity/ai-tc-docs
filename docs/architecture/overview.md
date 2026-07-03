@@ -84,9 +84,9 @@ tool-specific adapter, never a copy of the storage/detection logic.
 
 For web dashboards over local data with no server, the **OSS web-ui** reads that
 same `aka.db` directly (`@alsoknownassecurity/persistence`, Server Components) — there is no
-local _enterprise backend_. The enterprise backend is Postgres-only (see
-[Postgres-only enterprise]); the plugin syncs to it over HTTP in `attached` mode
-(Phase 2), never over a shared SQLite file. In Phase 1 nothing leaves the machine.
+local _enterprise backend_. The enterprise backend is Postgres-only; the plugin
+syncs to it over HTTP in `attached` mode (Phase 2), never over a shared SQLite
+file. In Phase 1 nothing leaves the machine.
 
 ## Data flow
 

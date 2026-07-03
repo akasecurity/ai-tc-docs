@@ -57,8 +57,10 @@ The stack is a TypeScript-strict pnpm monorepo:
     git clone https://github.com/your-org/ai-control-plane
     cd ai-control-plane
     pnpm setup
+    pnpm --filter @alsoknownassecurity/cli build
 
-    aka dashboard   # OSS web-ui over ~/.aka/data
+    # `aka` ships as a published package; from a source checkout, run the built bin:
+    pnpm --filter @alsoknownassecurity/cli exec aka dashboard   # OSS web-ui over ~/.aka/data
     ```
 
 === "Docker"

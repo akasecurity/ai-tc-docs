@@ -83,9 +83,8 @@ The container serves both the API and the dashboard from port 4000:
 ## Production docker-compose
 
 `docker/docker-compose.yml` is the production shape — the `app` service plus a
-**required** `postgres` service (the enterprise API is Postgres-only; see the
-[Postgres-only enterprise] decision). It requires two secrets and refuses to start
-if either is unset:
+**required** `postgres` service (the enterprise API is Postgres-only). It requires
+two secrets and refuses to start if either is unset:
 
 - `BETTER_AUTH_SECRET` — session-signing secret, **≥32 characters** (`openssl rand -hex 32`).
 - `BETTER_AUTH_URL` — the **browser-visible origin** users navigate to (e.g. `https://aka.example.com`); use `http://localhost:4000` only for a local trial, never in a real deployment.

@@ -5,11 +5,11 @@ sessions**, real tenant provisioning, and **Postgres** storage. Use it when you
 need to exercise the dashboard login/sign-up flow or the session-based API auth
 that production (`hosted` / `self-hosted`) uses.
 
-> **The enterprise backend is Postgres-only** (ADR: Postgres-only enterprise).
-> The config loader requires `STORAGE_DRIVER=postgres` for every non-`test` mode;
-> `sqlite` is rejected. For a no-Docker, no-Postgres setup, run the OSS stack
-> instead (the `aka` CLI + web-ui read the local store directly — see
-> [Local / Single-Node](local.md)).
+> **The enterprise backend is Postgres-only.** The SQLite storage path was removed
+> from the enterprise API, so set `STORAGE_DRIVER=postgres` for every non-`test`
+> mode — the backend has no SQLite repositories to fall back on. For a no-Docker,
+> no-Postgres setup, run the OSS stack instead (the `aka` CLI + web-ui read the
+> local store directly — see [Local / Single-Node](local.md)).
 
 ## Local vs Dev at a glance
 

@@ -5,8 +5,8 @@ AKA is configured entirely through environment variables. The `@alsoknownassecur
 ## Modes
 
 The `MODE` variable selects which schema is validated and which features are
-enabled. The enterprise backend is **Postgres-only** (see [ADR: Postgres-only
-enterprise]); every non-`test` mode requires `DATABASE_URL`.
+enabled. The enterprise backend is **Postgres-only**; every non-`test` mode
+requires `DATABASE_URL`.
 
 | `MODE`        | Use case                                                    |
 | ------------- | ----------------------------------------------------------- |
@@ -22,8 +22,11 @@ enterprise]); every non-`test` mode requires `DATABASE_URL`.
 ## Storage driver
 
 The enterprise backend uses Postgres exclusively — Postgres is an infra dependency
-it connects to, not a bundled engine. `STORAGE_DRIVER=sqlite` is **rejected** for
-every non-`test` mode.
+it connects to, not a bundled engine. The SQLite storage path was removed from the
+enterprise API, so **`STORAGE_DRIVER=postgres` is required** for every non-`test`
+mode; the backend has no SQLite repositories to fall back on. (Config-level
+validation still defaults `STORAGE_DRIVER` to `sqlite` for the OSS tooling — set it
+explicitly to `postgres` when running the enterprise backend.)
 
 | `STORAGE_DRIVER` | Driver               | Required vars  |
 | ---------------- | -------------------- | -------------- |
@@ -36,16 +39,16 @@ every non-`test` mode.
 
 ### Common (all modes)
 
-| Variable           | Default      | Description                                                         |
-| ------------------ | ------------ | ------------------------------------------------------------------- |
-| `NODE_ENV`         | `production` | Node environment: `development`, `test`, `production`               |
-| `MODE`             | `local`      | One of: `dev`, `hosted`, `self-hosted`, `test` (enterprise backend) |
-| `STORAGE_DRIVER`   | —            | **Required: `postgres`** for the enterprise backend                 |
-| `PORT`             | `4000`       | HTTP port the backend listens on                                    |
-| `HOST`             | `0.0.0.0`    | Interface to bind                                                   |
-| `LOG_LEVEL`        | `info`       | Pino log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace`  |
-| `MIGRATE_ON_START` | `false`      | Run pending migrations before accepting traffic                     |
-| `VERSION`          | `0.0.0`      | Injected by CI into the Docker image; appears in `/healthz`         |
+| Variable           | Default      | Description                                                        |
+| ------------------ | ------------ | ------------------------------------------------------------------ |
+| `NODE_ENV`         | `production` | Node environment: `development`, `test`, `production`              |
+| `MODE`             | `local`      | One of: `local` (default), `dev`, `hosted`, `self-hosted`, `test`  |
+| `STORAGE_DRIVER`   | —            | **Required: `postgres`** for the enterprise backend                |
+| `PORT`             | `4000`       | HTTP port the backend listens on                                   |
+| `HOST`             | `0.0.0.0`    | Interface to bind                                                  |
+| `LOG_LEVEL`        | `info`       | Pino log level: `fatal`, `error`, `warn`, `info`, `debug`, `trace` |
+| `MIGRATE_ON_START` | `false`      | Run pending migrations before accepting traffic                    |
+| `VERSION`          | `0.0.0`      | Injected by CI into the Docker image; appears in `/healthz`        |
 
 ### Test mode
 
@@ -143,8 +146,8 @@ that same `aka.db`; an enterprise backend URL + token (Phase 2) live in
     ```bash
     MODE=self-hosted
     STORAGE_DRIVER=postgres
-    DATABASE_URL=postgresql://aka_app:[REDACTED:PII]:5432/aka
-    ADMIN_DATABASE_URL=postgresql://aka:[REDACTED:PII]:5432/aka
+    DATABASE_URL=postgresql://aka_app:<password>@db.internal:5432/aka
+    ADMIN_DATABASE_URL=postgresql://aka:<password>@db.internal:5432/aka
     BETTER_AUTH_SECRET=<generate-with-openssl-rand-hex-32>
     BETTER_AUTH_URL=https://api.yourhost.com
     PORT=4000
