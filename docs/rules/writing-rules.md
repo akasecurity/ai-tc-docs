@@ -36,10 +36,11 @@ Every rule file must conform to `specVersion: 1`:
 
 ### Optional fields
 
-| Field            | Type       | Description                                                       |
-| ---------------- | ---------- | ----------------------------------------------------------------- |
-| `postValidators` | `string[]` | Validator names to run after a match (e.g. `"entropy"`, `"luhn"`) |
-| `examples`       | `string[]` | Positive examples used in documentation and tooling               |
+| Field            | Type                            | Description                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `postValidators` | `(string \| {name, config?})[]` | Validators to run after a match (e.g. `"entropy"`, `"luhn"`). The object form passes per-rule config — e.g. `{"name": "entropy", "config": {"minLength": 8, "threshold": 3.0}}` tunes the entropy gate for short password-shaped values (defaults are `minLength: 20`, `threshold: 3.5`, tuned for API keys)                                                                     |
+| `appliesTo`      | `{extensions: string[]}`        | Language/file scoping: run the rule only against text from files with one of these dot-prefixed extensions (e.g. `[".py"]`). When the scanned text has **no** file context (live prompt/response hooks) the rule still runs — pasted code has no knowable language. Use for language-specific APIs (`pickle.loads`, `ObjectInputStream`) to avoid cross-language false positives |
+| `examples`       | `string[]`                      | Positive examples used in documentation and tooling                                                                                                                                                                                                                                                                                                                              |
 
 ## Matcher types
 
@@ -142,6 +143,10 @@ A fixture is a JSON array of test cases:
 - Fixture text must be realistic enough to verify the pattern works in context (not just the bare value).
 - For regex rules: count characters carefully. Off-by-one is the most common fixture bug.
 - Negative fixtures should cover: too-short values, missing prefix, embedded in longer strings.
+- A fixture may set an optional `filePath` to simulate file context. Rules with
+  `appliesTo` must include a negative fixture whose `filePath` has an
+  out-of-scope extension, proving the gate works (and positives without
+  `filePath` prove the rule still fires when no file context exists).
 
 ## Example: writing a new rule
 
