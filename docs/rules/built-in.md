@@ -167,7 +167,7 @@ Structural rules over the plugin's [configuration-inventory scan](../plugin/clau
 | Rule                   | Severity | Fires when                                                                                                     |
 | ---------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
 | `hook-conflict`        | medium   | Two hooks on the same event with overlapping matchers both mutate the tool target — run order is undefined     |
-| `hook-unknown`         | high     | A settings-scope hook's command is attributable to no installed plugin and no recognizable tool (v1 heuristic) |
+| `hook-unknown`         | medium   | A settings-scope hook's command is attributable to no installed plugin and no recognizable tool (v1 heuristic) |
 | `hook-external-egress` | high     | A hook command contains network-egress primitives (`curl`, `wget`, `nc`, `ssh`, …) or a URL                    |
 
 ## Running the test suite
