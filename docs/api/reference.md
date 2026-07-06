@@ -2300,6 +2300,220 @@ to `"private"` and `policyDefault` to `"approved"` until updated.
 
 ---
 
+## My Health API (`/v1/my-health`)
+
+> **Status: All 13 endpoints live.**
+
+Per-user, per-harness endpoints backing the dashboard **My Configuration → My Health** page.
+Unlike Shares/Inventory (tenant-wide), every read/write here scopes to the caller's own
+`userId` **and** a single-select `harness` — there is no "all harnesses" or "all users" view.
+
+**Tag:** `my-health`  
+**Auth:** Bearer token required on every endpoint. Mutations (§7b, §7c, §8 scans/audits)
+additionally require a writable role — `403 forbidden` for `security_viewer`.  
+**Harness:** every read accepts an optional `harness` query param
+(`claudecode | cursor | copilot | codex | windsurf`), defaulting to `claudecode` when omitted.
+An unsupported value → `400 VALIDATION_ERROR`. Only `claudecode` is instrumented in v1 — every
+other harness resolves without error and returns empty collections / zeroed bodies (§9 reports
+`supported: false` for it).
+
+| #   | Method | Path                                             | operationId                        | Status   |
+| --- | ------ | ------------------------------------------------ | ---------------------------------- | -------- |
+| §1  | `GET`  | `/v1/my-health/summary`                          | `getMyHealthSummary`               | **Live** |
+| §2  | `GET`  | `/v1/my-health/topics`                           | `getMyHealthTopics`                | **Live** |
+| §3  | `GET`  | `/v1/my-health/enforcement`                      | `getMyHealthEnforcement`           | **Live** |
+| §4  | `GET`  | `/v1/my-health/efficiency`                       | `getMyHealthEfficiency`            | **Live** |
+| §5  | `GET`  | `/v1/my-health/skills`                           | `listMyHealthSkills`               | **Live** |
+| §6  | `GET`  | `/v1/my-health/hooks`                            | `listMyHealthHooks`                | **Live** |
+| §7  | `GET`  | `/v1/my-health/recommended-actions`              | `listMyHealthRecommendedActions`   | **Live** |
+| §7b | `POST` | `/v1/my-health/recommended-actions/{id}/apply`   | `applyMyHealthRecommendedAction`   | **Live** |
+| §7c | `POST` | `/v1/my-health/recommended-actions/{id}/dismiss` | `dismissMyHealthRecommendedAction` | **Live** |
+| §8  | `POST` | `/v1/my-health/scans`                            | `startMyHealthScan`                | **Live** |
+| §8  | `POST` | `/v1/my-health/audits`                           | `startMyHealthAudit`               | **Live** |
+| §8  | `GET`  | `/v1/my-health/jobs/{jobId}`                     | `getMyHealthJob`                   | **Live** |
+| §9  | `GET`  | `/v1/my-health/harnesses`                        | `listMyHealthHarnesses`            | **Live** |
+
+Responses are **semantic, not presentational** — no `color`/`icon`/`tile`/`tone` fields; the
+frontend maps those from the enums and raw counts below.
+
+---
+
+### §1 — GET /v1/my-health/summary
+
+Powers the page header sub-line and the Configuration health donut hero.
+
+**Response:** `200 MyHealthSummary`
+
+```json
+{
+  "harness": "claudecode",
+  "score": 72,
+  "scoreDelta": -8,
+  "openFindings": 6,
+  "scanCoveragePct": 100,
+  "tokensSaved": 128700,
+  "counts": { "skills": 8, "hooks": 8, "mcps": 6, "configFiles": 8 },
+  "scannedAt": "2026-07-04T15:09:00Z"
+}
+```
+
+`tokensSaved` is `null` while §4 efficiency is still `gathering`.
+
+---
+
+### §2 — GET /v1/my-health/topics
+
+Returns exactly one entry per `topic` enum (`skills`, `hooks`, `mcps`, `config`, `efficiency`),
+in display order, each with a `health` (0–100), a `status`
+(`ok`|`attention`|`at_risk`|`gathering`), and structured `issues[]`.
+
+**Response:** `200 MyHealthTopicsResponse`
+
+---
+
+### §3 — GET /v1/my-health/enforcement
+
+Fixed 7-day window; all three `enforcementKind` entries (`blocked`, `redacted`, `warned`) are
+always present, `count: 0` when there were none.
+
+**Response:** `200 MyHealthEnforcementResponse`
+
+---
+
+### §4 — GET /v1/my-health/efficiency
+
+Token-savings card. `status: "ready"` carries `tokensSaved`/`reductionPct`/`cacheHitPct`/
+`perSession`/`trend[]`/`contributors[]`; `status: "gathering"` (before enough baseline history
+exists) carries only `{ harness, status, daysCollected, daysNeeded }` — ready-only fields are
+genuinely absent, not `null`.
+
+**Response:** `200 MyHealthEfficiencyResponse`
+
+---
+
+### §5 — GET /v1/my-health/skills
+
+**Query:** `harness` (see shared); `status` (optional, `current|update_available|stale`);
+`limit` (optional, default `50`, `1–50`).
+
+**Response:** `200 MyHealthSkillsResponse`
+
+---
+
+### §6 — GET /v1/my-health/hooks
+
+**Query:** `harness` (see shared); `status` (optional, `active|conflict|unknown`); `limit`
+(optional, default `50`, `1–50`). A flagged hook (`conflict`/`unknown`) always carries a
+non-null `note` with the reason.
+
+**Response:** `200 MyHealthHooksResponse`
+
+---
+
+### §7 — GET /v1/my-health/recommended-actions
+
+Recommendations **and** config-security findings merged into one list, prioritized by
+severity. Excludes `applied`/`dismissed` items.
+
+**Query:** `harness` (see shared); `limit` (optional, default `20`, `1–50`).
+
+**Response:** `200 MyHealthRecommendedActionsResponse`
+
+`action.href` is present only when `action.mode: "navigate"`; absent when `"apply"` (that CTA
+posts to §7b instead).
+
+---
+
+### §7b — POST /v1/my-health/recommended-actions/{id}/apply
+
+Resolves the concrete change server-side from `id` and marks the recommendation `applied`.
+
+> **v1 scope:** this is a documented **state-flip only** — it marks the row `applied` and
+> echoes the resolved action's `type`; it does not yet perform a real config mutation (no
+> config-mutation executor subsystem exists yet — lands with the ingestion milestone).
+
+**Auth:** Bearer token required. Requires a writable role — `security_viewer` → `403 forbidden`.
+
+**Response:** `200 ApplyMyHealthActionResponse` | `401` | `403 forbidden` | `404
+recommendation_not_found` | `409 already_resolved` | `422 not_applicable` (mode is `navigate`,
+or the underlying target changed / actionJson is corrupt)
+
+---
+
+### §7c — POST /v1/my-health/recommended-actions/{id}/dismiss
+
+Marks the recommendation `dismissed`. No mode restriction (unlike apply) — a `navigate`-mode
+row can be dismissed too.
+
+**Auth:** Bearer token required. Requires a writable role — `security_viewer` → `403 forbidden`.
+
+**Response:** `200 DismissMyHealthActionResponse` | `401` | `403 forbidden` | `404
+recommendation_not_found` | `409 already_resolved`
+
+---
+
+### §8 — Rescan & full audit (header actions)
+
+The header's **Rescan** and **Run full audit** buttons each start an asynchronous job and
+return a `jobId` to poll; the page's reads (§1–§7) are re-fetched once the job succeeds.
+
+**Start:** `POST /v1/my-health/scans` (`startMyHealthScan`) · `POST /v1/my-health/audits`
+(`startMyHealthAudit`)  
+**Auth:** Bearer token required. Requires a writable role — `security_viewer` → `403 forbidden`.  
+**Request body (`StartMyHealthJobBody`):** `{ "harness": "claudecode" }` — `harness` is
+**required** (no default on this body schema, unlike the GET reads' query param).
+
+**Response:** `202 MyHealthJob` | `400 VALIDATION_ERROR` | `401` | `403 forbidden`
+
+```json
+{ "jobId": "job_01HZX…", "kind": "scan", "status": "queued", "startedAt": "2026-07-04T15:11:00Z" }
+```
+
+**Poll:** `GET /v1/my-health/jobs/{jobId}` (`getMyHealthJob`)
+
+**Response:** `200 MyHealthJob` | `401` | `404` (unknown id, or a job started by another user —
+no existence leak)
+
+```json
+{
+  "jobId": "job_01HZX…",
+  "kind": "scan",
+  "status": "running",
+  "progressPct": 40,
+  "completedAt": null
+}
+```
+
+`status` moves `queued` → `running` → `succeeded` (`failed` is in the enum for contract
+completeness but has no fixture path in this milestone — there is no real executor to fail).
+`status` and `progressPct` are derived from elapsed wall-clock against a fixed synthetic
+duration per `kind` — no real scanner runs. `completedAt` is deterministic
+(`startedAt + duration`) once the job is done, so repeated polls after completion return an
+identical body (never drifts to "now"). Two `POST`s always create independent job rows, even
+for the same harness — there is no dedup/unique index on jobs.
+
+---
+
+### §9 — GET /v1/my-health/harnesses
+
+Powers the header **Harness** filter. No query params.
+
+**Response:** `200 MyHealthHarnessesResponse`
+
+```json
+{
+  "items": [
+    { "harness": "claudecode", "supported": true },
+    { "harness": "cursor", "supported": false },
+    { "harness": "copilot", "supported": false },
+    { "harness": "codex", "supported": false },
+    { "harness": "windsurf", "supported": false }
+  ]
+}
+```
+
+---
+
 ## Planned endpoints
 
 These endpoints are defined in `packages/schema/src/zod/api.ts` but not yet implemented:
