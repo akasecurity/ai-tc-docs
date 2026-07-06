@@ -62,7 +62,10 @@ Exit code semantics: exit `0` and Claude Code parses stdout JSON; no output mean
 `UserPromptSubmit`:
 
 ```json
-{ "decision": "block", "reason": "AKA blocked this prompt (secrets/aws-access-key). ..." }
+{
+  "decision": "block",
+  "reason": "AKA blocked this prompt — flagged secrets/aws-access-key (A******E). Remove the flagged content and resubmit.\nIf this is intentional and you accept the risk, grant an exception:\n  aka exception approve 3f2a91       (asks for scope + reason, then resubmit)\nMore: aka exception --help"
+}
 ```
 
 ```json
@@ -123,13 +126,13 @@ Findings persist locally to a SQLite store at `~/.aka/data/aka.db`, so the plugi
 A block (or redact) message now guides the user toward the sanctioned escape hatch instead of a dead end. Removing the flagged content remains the primary recommendation; when the block is intentional (say, a temporary credential the user will rotate), the message includes a copy-paste-complete command:
 
 ```
-AKA blocked this prompt — flagged aws-access-key-id (AKIA******Q). Remove the flagged content and resubmit.
+AKA blocked this prompt — flagged secrets/aws-access-key (A******E). Remove the flagged content and resubmit.
 If this is intentional and you accept the risk, grant an exception:
   aka exception approve 3f2a91       (asks for scope + reason, then resubmit)
 More: aka exception --help
 ```
 
-The reference (`3f2a91`) points at a short-lived, fingerprint-only record of what was blocked, so `aka exception approve` can create the grant without the user ever retyping the secret. The approved value itself is never stored — only a keyed fingerprint and a masked preview. See [Detection exceptions](../cli/exceptions.md) for the full walkthrough.
+The masked preview reveals only the first and last character of the detected value (`A******E`), and the reference (`3f2a91`) points at a short-lived, fingerprint-only record of what was blocked, so `aka exception approve` can create the grant without the user ever retyping the secret. The approved value itself is never stored — only a keyed fingerprint and a masked preview. See [Detection exceptions](../cli/exceptions.md) for the full walkthrough.
 
 The raw matched secret is **never** stored or shown — only a masked form. All are read-only; they never mutate the database. They also work directly:
 
@@ -271,7 +274,7 @@ Hooks are also testable without Claude Code:
 
 ```bash
 echo '{"prompt":"key AKIAIOSFODNN7EXAMPLE"}' | node apps/plugin-claude-code/scripts/user-prompt-submit.js
-# → {"decision":"block","reason":"AKA blocked this prompt (secrets/aws-access-key). ..."}
+# → {"decision":"block","reason":"AKA blocked this prompt — flagged secrets/aws-access-key (A******E). Remove the flagged content and resubmit.\n..."}
 
 echo 'not json' | node apps/plugin-claude-code/scripts/user-prompt-submit.js
 # → no output, exit 0 (fail-open)
