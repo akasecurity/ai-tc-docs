@@ -19,7 +19,8 @@ apps/plugin-claude-code/
 │   ├── recommend.md     #   /aka:recommend — top recommendations
 │   ├── audit.md         #   /aka:audit     — recent enforcement decisions
 │   ├── scan.md          #   /aka:scan      — scan working tree for code flaws
-│   └── tokens.md        #   /aka:tokens    — token usage + estimated cost
+│   ├── tokens.md        #   /aka:tokens    — token usage + estimated cost
+│   └── exceptions.md    #   /aka:exceptions — active detection exceptions (read-only)
 └── scripts/*.js         # built scripts (tsup output, self-contained):
                          #   hooks + query.js (read surface) + dashboard.js + onboard.js
 ```
@@ -105,14 +106,30 @@ The hooks cannot do everything the warn/redact/block model might imply:
 
 Findings persist locally to a SQLite store at `~/.aka/data/aka.db`, so the plugin is useful with **zero backend**. These read-only commands surface that store as space-aligned monospace output (shade-block bars — no ANSI, no TUI framework, so it renders verbatim in the transcript). Each is a thin wrapper that runs `scripts/query.js <subcommand>` and shows the output verbatim:
 
-| Command          | Shows                                                                           |
-| ---------------- | ------------------------------------------------------------------------------- |
-| `/aka:health`    | detection activity, action breakdown, category coverage, last 7 days            |
-| `/aka:findings`  | recent findings with rule, category, severity, action, and the **masked** match |
-| `/aka:recommend` | findings grouped by category (ranked by severity, then frequency) + next steps  |
-| `/aka:audit`     | the decision log — recent detections and the action AKA took                    |
-| `/aka:scan`      | scan working-tree source files for insecure code patterns (OWASP Top 10)        |
-| `/aka:tokens`    | token usage per provider/model (reconciled from transcripts) + estimated cost   |
+| Command           | Shows                                                                           |
+| ----------------- | ------------------------------------------------------------------------------- |
+| `/aka:health`     | detection activity, action breakdown, category coverage, last 7 days            |
+| `/aka:findings`   | recent findings with rule, category, severity, action, and the **masked** match |
+| `/aka:recommend`  | findings grouped by category (ranked by severity, then frequency) + next steps  |
+| `/aka:audit`      | the decision log — recent detections and the action AKA took                    |
+| `/aka:scan`       | scan working-tree source files for insecure code patterns (OWASP Top 10)        |
+| `/aka:tokens`     | token usage per provider/model (reconciled from transcripts) + estimated cost   |
+| `/aka:exceptions` | active detection exceptions — masked value, rule, scope, expiry, uses           |
+
+`/aka:exceptions` is deliberately **read-only**: creating, approving, or revoking an exception happens only out-of-band in a terminal via the `aka` CLI, never from inside a Claude Code session — the session being policed must not be able to grant its own bypass.
+
+## When a detection blocks: exception guidance
+
+A block (or redact) message now guides the user toward the sanctioned escape hatch instead of a dead end. Removing the flagged content remains the primary recommendation; when the block is intentional (say, a temporary credential the user will rotate), the message includes a copy-paste-complete command:
+
+```
+AKA blocked this prompt — flagged aws-access-key-id (AKIA******Q). Remove the flagged content and resubmit.
+If this is intentional and you accept the risk, grant an exception:
+  aka exception approve 3f2a91       (asks for scope + reason, then resubmit)
+More: aka exception --help
+```
+
+The reference (`3f2a91`) points at a short-lived, fingerprint-only record of what was blocked, so `aka exception approve` can create the grant without the user ever retyping the secret. The approved value itself is never stored — only a keyed fingerprint and a masked preview. See [Detection exceptions](../cli/exceptions.md) for the full walkthrough.
 
 The raw matched secret is **never** stored or shown — only a masked form. All are read-only; they never mutate the database. They also work directly:
 
