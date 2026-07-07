@@ -63,6 +63,7 @@ nav:
   - Getting Started:
       - Quickstart: getting-started/quickstart.md
       - CLI (aka): getting-started/cli.md
+      - Detection Exceptions: cli/exceptions.md
       - Configuration: getting-started/configuration.md
   - Architecture:
       - System Overview: architecture/overview.md
