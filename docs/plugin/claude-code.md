@@ -176,6 +176,15 @@ The settings file is **versioned** (`specVersion`): each onboarding step is one 
 
 When `historicalAccess: full` is chosen, `/aka:setup` runs `scripts/backfill.js` at the end of onboarding. It sweeps prior Claude Code transcripts (`~/.claude/projects/*/*.jsonl`, all projects, last 30 days), extracts user prompts and assistant replies, and feeds each through the **same** detect→mask→record path the live hooks use — so secrets that leaked _before_ AKA was installed surface in `/findings` alongside live ones. Findings carry their original transcript timestamp (not scan time), and only messages that actually match a rule are persisted. Tool inputs/outputs are not yet scanned. The scan is **idempotent** — it loads the store's existing content hashes and skips any message already recorded — so re-running `/aka:setup` re-scans without ever duplicating findings, and a cleared store re-scans in full. Fully fail-open. After install, no backfill is needed — the `UserPromptSubmit`/`PreToolUse`/`PostToolUse` hooks already see everything.
 
+### Configuration-inventory scan (skills & hooks)
+
+Once per session (on `SessionStart`, under the same once-per-session claim as the inventory pass), the plugin scans the machine's Claude Code **configuration surface** and records it in the local store:
+
+- **Hooks** from `~/.claude/settings.json` (user scope), `<project>/.claude/settings.json` (project), `<project>/.claude/settings.local.json` (local), and each installed plugin's `hooks/hooks.json` (attributed to its plugin via `~/.claude/plugins/installed_plugins.json` — never by guessing directory layouts).
+- **Skills** from `~/.claude/skills/`, `<project>/.claude/skills/`, and installed plugins' `skills/` directories — name/description/version from `SKILL.md` frontmatter, freshness from file mtime.
+
+Everything is **read-only**: the scan never edits config, and never captures environment values or secrets — hook commands, matchers, scopes, and skill metadata only. Each artifact becomes a content-addressed inventory row (re-scans update it in place; an uninstalled artifact simply goes stale and stops rendering), and each scan writes one `config_scan` audit event recording counts and any files that failed to parse. A malformed settings file never breaks the scan — the remaining sources are still collected, and the failure is noted on the scan event. Fully fail-open, like every hook path.
+
 Environment variables are **not** used: hooks are processes spawned by Claude Code, so a slash command cannot inject env into them — a file is the only reliable channel.
 
 Unconfigured is a valid state: until `/aka:setup` runs, detection still uses the bundled rule packs and default actions (`secret` → block, `pii` → redact where possible), and the first prompt nudges the user to run the wizard.
