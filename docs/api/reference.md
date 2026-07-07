@@ -120,8 +120,8 @@ Health check endpoint. No authentication required.
 ```json
 {
   "status": "ok",
-  "mode": "local",
-  "storageDriver": "sqlite",
+  "mode": "dev",
+  "storageDriver": "postgres",
   "version": "0.0.1"
 }
 ```

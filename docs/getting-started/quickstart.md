@@ -18,43 +18,31 @@ pnpm setup   # pnpm install + lefthook hooks
 
 ## 2. Start the backend
 
-=== "Local SQLite (simplest)"
+The enterprise backend is **Postgres-only**. Bring up the full dev stack (Postgres
+is provided as a service):
 
-    No database setup required. The backend creates and migrates its own SQLite file on first run.
+```bash
+docker compose -f docker/docker-compose.dev.yml up
+```
 
-    ```bash
-    MODE=local \
-      STORAGE_DRIVER=sqlite \
-      AKA_LOCAL_TOKEN=mytoken1234567890 \
-      MIGRATE_ON_START=true \
-      pnpm --filter @alsoknownassecurity/backend dev
-    ```
+Services:
 
-    The server starts on **port 4000**.
+| URL                     | Service                 |
+| ----------------------- | ----------------------- |
+| `http://localhost:4000` | Backend (Postgres)      |
+| `http://localhost:5173` | Dashboard               |
+| `http://localhost:8000` | Docs                    |
+| `http://localhost:8025` | Mailpit (email preview) |
 
-=== "Full Docker stack"
-
-    Postgres + backend (hosted mode) + backend (local mode) + dashboard + docs:
-
-    ```bash
-    docker compose -f docker/docker-compose.dev.yml up
-    ```
-
-    Services:
-
-    | URL | Service |
-    |---|---|
-    | `http://localhost:4000` | Backend (Postgres / hosted mode) |
-    | `http://localhost:4001` | Backend (SQLite / local mode) |
-    | `http://localhost:5173` | Dashboard |
-    | `http://localhost:8000` | Docs |
-    | `http://localhost:8025` | Mailpit (email preview) |
+> For a single-user, no-server experience, use the OSS stack instead — the `aka`
+> CLI + web-ui read the local SQLite store directly. See
+> [Local / Single-Node](../deployment/local.md).
 
 ## 3. Verify the backend is running
 
 ```bash
 curl http://localhost:4000/healthz
-# → {"status":"ok","mode":"local","storageDriver":"sqlite","version":"0.0.1"}
+# → {"status":"ok","mode":"dev","storageDriver":"postgres","version":"0.0.1"}
 ```
 
 ## 4. Send a test event

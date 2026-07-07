@@ -12,14 +12,13 @@ docker compose -f docker/docker-compose.dev.yml up
 
 ### Services
 
-| Service         | Port        | Description                                  |
-| --------------- | ----------- | -------------------------------------------- |
-| `postgres`      | 5432        | PostgreSQL 16                                |
-| `backend`       | 4000        | Backend in hosted/Postgres mode, live reload |
-| `backend-local` | 4001        | Backend in local/SQLite mode, live reload    |
-| `dashboard`     | 5173        | Vite dev server with HMR                     |
-| `docs`          | 8000        | MkDocs Material live reload                  |
-| `mailpit`       | 8025 / 1025 | Email preview (SMTP + web UI)                |
+| Service     | Port        | Description                     |
+| ----------- | ----------- | ------------------------------- |
+| `postgres`  | 5432        | PostgreSQL 16                   |
+| `backend`   | 4000        | Backend (Postgres), live reload |
+| `dashboard` | 5173        | Vite dev server with HMR        |
+| `docs`      | 8000        | MkDocs Material live reload     |
+| `mailpit`   | 8025 / 1025 | Email preview (SMTP + web UI)   |
 
 ### Selective startup
 
@@ -28,9 +27,6 @@ Run only the services you need:
 ```bash
 # Backend + Postgres only
 docker compose -f docker/docker-compose.dev.yml up postgres backend
-
-# Local SQLite mode only (no Postgres)
-docker compose -f docker/docker-compose.dev.yml up backend-local
 
 # Docs site only
 docker compose -f docker/docker-compose.dev.yml up docs
@@ -71,7 +67,6 @@ docker run -d \
   --name aka \
   -p 4000:4000 \
   -e MODE=self-hosted \
-  -e STORAGE_DRIVER=postgres \
   -e DATABASE_URL=postgresql://user:pass@db:5432/aka \
   -e AKA_LOCAL_TOKEN=$(openssl rand -hex 32) \
   -e MIGRATE_ON_START=true \
@@ -86,22 +81,22 @@ The container serves both the API and the dashboard from port 4000:
 
 ## Production docker-compose
 
-`docker/docker-compose.yml` is the production shape — a single `app` service with an optional `postgres` profile. It **requires** two secrets and refuses to start if either is unset:
+`docker/docker-compose.yml` is the production shape — the `app` service plus a
+**required** `postgres` service (the enterprise API is Postgres-only). It requires
+two secrets and refuses to start if either is unset:
 
 - `BETTER_AUTH_SECRET` — session-signing secret, **≥32 characters** (`openssl rand -hex 32`).
 - `BETTER_AUTH_URL` — the **browser-visible origin** users navigate to (e.g. `https://aka.example.com`); use `http://localhost:4000` only for a local trial, never in a real deployment.
 
 ```bash
-# SQLite (simplest self-hosted)
 BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
   BETTER_AUTH_URL=http://localhost:4000 \
   docker compose -f docker/docker-compose.yml up
-
-# With Postgres
-BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
-  BETTER_AUTH_URL=http://localhost:4000 \
-  docker compose -f docker/docker-compose.yml --profile postgres up
 ```
+
+Postgres comes up as a service (with the `aka_app` runtime role seeded from
+`docker/postgres-init/`); the app applies migrations at boot
+(`MIGRATE_ON_START=true`) via the owner role.
 
 Passing them inline like this is fine for a quick trial; for a real deployment put them in the `.env` file below so they persist and stay out of your shell history.
 
@@ -112,7 +107,6 @@ Create a `.env` file for production secrets (do not commit this):
 ```bash
 # .env (gitignored)
 MODE=self-hosted
-STORAGE_DRIVER=postgres
 DATABASE_URL=postgresql://aka:supersecret@db:5432/aka
 # Required — the app refuses to start without these.
 BETTER_AUTH_SECRET=<output of: openssl rand -hex 32>   # ≥32 chars
@@ -156,16 +150,10 @@ To ship to a managed backend (AWS CloudWatch/X-Ray, Azure Monitor) instead, edit
 
 ## Persistent data
 
-For SQLite in production, mount a volume for the database file:
-
-```bash
-docker run -d \
-  -v aka-data:/data \
-  -e SQLITE_PATH=/data/aka.db \
-  aka-control-plane:latest
-```
-
-For Postgres, use a managed database (AWS RDS, Supabase, Neon, etc.) and set `DATABASE_URL` accordingly.
+The enterprise API stores everything in Postgres. Use a managed database (AWS
+RDS, Supabase, Neon, etc.) or the bundled `postgres` service with a persistent
+volume, and set `DATABASE_URL` (runtime `aka_app` role) + `ADMIN_DATABASE_URL`
+(owner, for migrations) accordingly.
 
 ## Updating
 

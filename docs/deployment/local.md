@@ -1,73 +1,82 @@
-# Local Mode
+# Local / Single-Node
 
-Local mode runs AKA as a single-user, single-process setup using SQLite. It requires no Docker, no Postgres, and no additional services — just Node.js and pnpm.
+There are two ways to run AKA locally, depending on whether you want the
+enterprise control plane or just the open-source single-node experience.
 
-## Use cases
+## Option A — OSS single-node (no server, no Docker, no Postgres)
 
-- Individual developer running the full stack on their laptop
-- CI environments running integration tests
-- Quick demos and evaluations
-
-## Starting the backend
-
-The built binary is the most portable option:
+The open-source surface needs **no backend at all**. The Claude Code plugin (and
+the `aka` CLI) write a local SQLite store at `~/.aka/data/aka.db` via
+`@alsoknownassecurity/persistence` (Node's built-in `node:sqlite` — no native dependency), and
+the OSS web dashboard reads that same store directly in Server Components. Nothing
+leaves the machine; there is no account, no network, no database server.
 
 ```bash
-# Build first
-pnpm build
-
-# Run
-MODE=local \
-  STORAGE_DRIVER=sqlite \
-  AKA_LOCAL_TOKEN=mytoken1234567890 \
-  SQLITE_PATH=./aka.db \
-  MIGRATE_ON_START=true \
-  node apps/backend/dist/main.js
+# The plugin self-installs and writes ~/.aka/data/aka.db during Claude Code sessions.
+# Browse your local findings/health with the OSS dashboard:
+aka dashboard        # launches the Next.js web-ui over ~/.aka/data
+# or a terminal view:
+aka tui
 ```
 
-For development with live reload:
+See the [CLI guide](../getting-started/cli.md) and the
+[Claude Code plugin](../plugin/claude-code.md) page. This is the recommended
+single-user local experience.
+
+## Option B — the enterprise backend, locally
+
+The enterprise control plane (`apps/backend`) is **Postgres-only** — Postgres is
+an infra dependency it connects to, never a bundled engine. Run it against the
+Postgres that `docker-compose` provides:
 
 ```bash
-MODE=local \
-  STORAGE_DRIVER=sqlite \
-  AKA_LOCAL_TOKEN=mytoken1234567890 \
-  SQLITE_PATH=./aka.db \
+docker compose -f docker/docker-compose.dev.yml up
+```
+
+This brings up Postgres (with the `aka_app` runtime role seeded from
+`docker/postgres-init/`), the backend, and the enterprise dashboard. The backend
+reads `DATABASE_URL` (the non-superuser `aka_app` role) at runtime and applies
+migrations at boot via `ADMIN_DATABASE_URL` (the owner role) when
+`MIGRATE_ON_START=true`.
+
+To run the backend directly against a Postgres you provide:
+
+```bash
+MODE=dev \
+  DATABASE_URL=postgresql://aka_app:akaapppw@localhost:5432/aka \
+  ADMIN_DATABASE_URL=postgresql://aka:akadev@localhost:5432/aka \
   MIGRATE_ON_START=true \
+  BETTER_AUTH_SECRET="$(openssl rand -hex 32)" \
+  BETTER_AUTH_URL=http://localhost:4000 \
   pnpm --filter @alsoknownassecurity/backend dev
 ```
 
-## What `MIGRATE_ON_START` does
+> The enterprise backend no longer supports SQLite — the SQLite storage path was
+> removed from the enterprise API. Postgres is mandatory because every non-`test`
+> mode requires `DATABASE_URL` (the legacy `STORAGE_DRIVER` variable is no longer
+> read by the backend).
 
-When `MIGRATE_ON_START=true`, the backend:
+## Applying migrations manually
 
-1. Runs all pending migrations from `apps/backend/drizzle/sqlite/`
-2. Creates stub tenant and user rows (`00000000-0000-0000-0000-000000000001/2`) for local single-user mode
-
-These seed rows satisfy the foreign key constraints in the events table. In production multi-tenant mode, real tenant/user rows are created via the auth flow instead.
-
-## SQLite file location
-
-Set `SQLITE_PATH` to any writable path:
-
-| Value                 | Use case                                           |
-| --------------------- | -------------------------------------------------- |
-| `./aka.db`            | Persistent file in the current directory           |
-| `/var/lib/aka/aka.db` | Persistent file in a system directory              |
-| `:memory:`            | In-memory only (used by Vitest; data lost on exit) |
-
-## Running the dashboard
-
-The dashboard dev server proxies API calls to the backend:
+Apply the Postgres schema migrations via the backend's `migrate:pg` script (it
+runs the migrator through `tsx`):
 
 ```bash
-pnpm --filter @alsoknownassecurity/dashboard dev
+ADMIN_DATABASE_URL="$ADMIN_DATABASE_URL" \
+  pnpm --filter @alsoknownassecurity/backend migrate:pg
 ```
 
-Navigate to `http://localhost:5173`. The proxy is configured in `apps/dashboard/vite.config.ts` to forward `/v1` and `/healthz` to `localhost:4000`.
+Upgrading an existing self-hosted install that still runs on the old SQLite image?
+Run the one-shot data migration first (the `aka-migrate` bin ships with the
+published package; from a repo checkout run its source through `tsx`):
+
+```bash
+pnpm exec tsx tools/migrator/src/cli.ts data-sqlite-to-postgres \
+  --db-path /app/data/aka.db \
+  --url "$ADMIN_DATABASE_URL"
+```
 
 ## Running the docs
-
-With Python installed:
 
 ```bash
 pip install -r apps/docs/requirements.txt
@@ -75,63 +84,3 @@ pnpm --filter @alsoknownassecurity/docs dev
 ```
 
 Navigate to `http://localhost:8000`.
-
-## Running everything locally (without Docker)
-
-```bash
-# Terminal 1 — backend
-MODE=local STORAGE_DRIVER=sqlite AKA_LOCAL_TOKEN=mytoken1234567890 \
-  MIGRATE_ON_START=true SQLITE_PATH=./aka.db \
-  pnpm --filter @alsoknownassecurity/backend dev
-
-# Terminal 2 — dashboard
-pnpm --filter @alsoknownassecurity/dashboard dev
-
-# Terminal 3 — docs (optional)
-pnpm --filter @alsoknownassecurity/docs dev
-```
-
-## Applying migrations manually
-
-To apply migrations without starting the server (useful for CI or scripts):
-
-```bash
-# Via the migrator CLI
-pnpm --filter @alsoknownassecurity/migrator start -- sqlite \
-  --db-path ./aka.db \
-  --migrations-dir apps/backend/drizzle/sqlite
-
-# Or directly with drizzle-kit
-pnpm --filter @alsoknownassecurity/backend migrate
-```
-
-## Typical local workflow
-
-```bash
-# 1. Start the backend with fresh DB
-rm -f ./aka.db
-MODE=local STORAGE_DRIVER=sqlite AKA_LOCAL_TOKEN=mytoken1234567890 \
-  MIGRATE_ON_START=true pnpm --filter @alsoknownassecurity/backend dev &
-
-# 2. Verify it's up
-curl http://localhost:4000/healthz
-
-# 3. Start a Claude Code session — the plugin will forward events
-# (make sure AKA_BACKEND_URL and AKA_LOCAL_TOKEN are exported)
-
-# 4. Watch events appear
-watch -n2 'curl -s http://localhost:4000/v1/events \
-  -H "Authorization: Bearer mytoken1234567890" | jq .items[].id'
-```
-
-## Environment variable quick reference
-
-```bash
-MODE=local                        # Required: enables local mode
-STORAGE_DRIVER=sqlite             # Required: use SQLite
-AKA_LOCAL_TOKEN=<16+ chars>      # Required: Bearer token for API access
-SQLITE_PATH=./aka.db              # Where to store the database
-MIGRATE_ON_START=true             # Run migrations + seed on startup
-PORT=4000                         # HTTP port (default: 4000)
-LOG_LEVEL=info                    # Logging verbosity
-```

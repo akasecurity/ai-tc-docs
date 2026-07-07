@@ -5,11 +5,12 @@ sessions**, real tenant provisioning, and **Postgres** storage. Use it when you
 need to exercise the dashboard login/sign-up flow or the session-based API auth
 that production (`hosted` / `self-hosted`) uses.
 
-> **Dev mode requires Postgres.** SQLite is reserved for `local` and `test`. The
-> config loader picks its schema by `STORAGE_DRIVER`, and the
-> `local`-token contract makes `MODE=dev` + `STORAGE_DRIVER=sqlite` an
-> unsatisfiable combination — the backend refuses to boot. Use `local` mode for
-> a no-Docker, no-Postgres setup (see [Local Mode](local.md)).
+> **The enterprise backend is Postgres-only.** The SQLite storage path was removed
+> from the enterprise API; every non-`test` mode requires `DATABASE_URL` and the
+> backend crashes at startup without it. (The legacy `STORAGE_DRIVER` variable is no
+> longer read by the backend.) For a no-Docker, no-Postgres setup, run the OSS stack
+> instead (the `aka` CLI + web-ui read the local store directly — see
+> [Local / Single-Node](local.md)).
 
 ## Local vs Dev at a glance
 
@@ -53,7 +54,6 @@ Re-running is safe — the migrator skips already-applied migrations.
 
 ```bash
 MODE=dev \
-  STORAGE_DRIVER=postgres \
   DATABASE_URL=postgresql://aka_app:akaapppw@localhost:5432/aka \
   ADMIN_DATABASE_URL=postgresql://aka:akadev@localhost:5432/aka \
   BETTER_AUTH_SECRET=$(openssl rand -hex 32) \
@@ -129,8 +129,7 @@ See [Observability](../operations/observability.md) for the full guide.
 
 ```bash
 MODE=dev                              # Required: enables the Better Auth session path
-STORAGE_DRIVER=postgres               # Required: dev mode is Postgres-only
-DATABASE_URL=postgres://aka_app:…/aka # Required: runtime — non-owner app role (RLS enforced)
+DATABASE_URL=postgres://aka_app:…/aka # Required: runtime — non-owner app role (RLS enforced); makes Postgres mandatory
 ADMIN_DATABASE_URL=postgres://aka:…/aka # Migrations only — owner role
 BETTER_AUTH_SECRET=<32+ chars>        # Required: signs sessions
 BETTER_AUTH_URL=http://localhost:4000 # Recommended: base URL for callbacks
