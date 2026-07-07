@@ -183,6 +183,8 @@ curl http://localhost:9464/metrics
 
 Ingest a batch of events. Deduplicates by `event.id` — re-sending the same ID is safe and returns `duplicates: 1`.
 
+For re-runnable bulk ingest (the worktree scan, the transcript backfill), set the optional batch-level `"dedupe": "content-hash"`: an event whose `contentHash` the tenant has already recorded is then also counted as a duplicate, so a re-run that mints fresh event ids for identical content doesn't accumulate duplicate events and findings. Live hook traffic must **not** set it — two genuinely separate but identical prompts both belong on the timeline.
+
 **Request body:**
 
 ```json
@@ -204,21 +206,29 @@ Ingest a batch of events. Deduplicates by `event.id` — re-sending the same ID 
 }
 ```
 
+**Batch fields:**
+
+| Field    | Type  | Required | Description                                                        |
+| -------- | ----- | -------- | ------------------------------------------------------------------ |
+| `events` | array | Yes      | 1–100 events                                                       |
+| `dedupe` | enum  | No       | `"content-hash"` — also reject events whose hash is already stored |
+
 **Event fields:**
 
-| Field                | Type     | Required | Description                                   |
-| -------------------- | -------- | -------- | --------------------------------------------- |
-| `id`                 | UUID     | Yes      | Client-generated idempotency key              |
-| `sourceTool`         | string   | Yes      | `"claude-code"`, `"cursor"`, etc.             |
-| `kind`               | enum     | Yes      | `"prompt"` \| `"response"` \| `"code_change"` |
-| `occurredAt`         | ISO 8601 | Yes      | When the event happened                       |
-| `contentHash`        | string   | Yes      | Hash of the content for deduplication         |
-| `content`            | string   | Yes      | Full text of the prompt/response              |
-| `metadata`           | object   | No       | Arbitrary key-value pairs                     |
-| `metadata.sessionId` | string   | No       | Claude session identifier                     |
-| `metadata.model`     | string   | No       | AI model used                                 |
-| `metadata.repo`      | string   | No       | Repository name                               |
-| `metadata.filePath`  | string   | No       | File being edited                             |
+| Field                 | Type     | Required | Description                                                                     |
+| --------------------- | -------- | -------- | ------------------------------------------------------------------------------- |
+| `id`                  | UUID     | Yes      | Client-generated idempotency key                                                |
+| `sourceTool`          | string   | Yes      | `"claude-code"`, `"cursor"`, etc.                                               |
+| `kind`                | enum     | Yes      | `"prompt"` \| `"response"` \| `"code_change"`                                   |
+| `occurredAt`          | ISO 8601 | Yes      | When the event happened                                                         |
+| `contentHash`         | string   | Yes      | Hash of the content for deduplication                                           |
+| `content`             | string   | Yes      | Full text of the prompt/response                                                |
+| `metadata`            | object   | No       | Arbitrary key-value pairs                                                       |
+| `metadata.sessionId`  | string   | No       | Claude session identifier                                                       |
+| `metadata.model`      | string   | No       | AI model used                                                                   |
+| `metadata.repo`       | string   | No       | Repository name                                                                 |
+| `metadata.filePath`   | string   | No       | File being edited                                                               |
+| `metadata.gitignored` | boolean  | No       | Scan provenance: file was excluded by `.gitignore` (findings are informational) |
 
 **Response `200 OK`:**
 
@@ -1701,6 +1711,592 @@ The 6 findings routes are registered in this order to prevent parametric routes 
 6. `POST /v1/findings/:groupId/action`
 
 Fastify's find-my-way radix router prioritises static segments over parametric regardless of order — ordering is for readability and defensive correctness.
+
+---
+
+## Inventory API (`/v1/inventory`)
+
+> **Status: All 12 endpoints live.**
+
+**Tag:** `inventory`  
+**Auth:** Bearer token required on every endpoint. Mutations (§8, §9, §11, §12)
+additionally require inventory write permission — `403 forbidden` otherwise.
+
+| #   | Method | Path                                             | operationId         | Status   |
+| --- | ------ | ------------------------------------------------ | ------------------- | -------- |
+| §1  | `GET`  | `/v1/inventory/stats`                            | `getInventoryStats` | **Live** |
+| §2  | `GET`  | `/v1/inventory/harnesses`                        | `listHarnesses`     | **Live** |
+| §3  | `GET`  | `/v1/inventory/assets`                           | `listAssets`        | **Live** |
+| §4  | `GET`  | `/v1/inventory/assets/:assetId`                  | `getAsset`          | **Live** |
+| §5  | `GET`  | `/v1/inventory/projects`                         | `listProjects`      | **Live** |
+| §6  | `GET`  | `/v1/inventory/projects/:projectId/tree`         | `getProjectTree`    | **Live** |
+| §7  | `GET`  | `/v1/inventory/projects/:projectId/files`        | `getProjectFile`    | **Live** |
+| §8  | `PUT`  | `/v1/inventory/projects/:projectId/files/access` | `setFileAccess`     | **Live** |
+| §9  | `PUT`  | `/v1/inventory/assets/:assetId/trust`            | `setMcpTrust`       | **Live** |
+| §10 | `GET`  | `/v1/inventory/harnesses/:harnessId/events`      | `getHarnessEvents`  | **Live** |
+| §11 | `POST` | `/v1/inventory/rescan`                           | `rescanInventory`   | **Live** |
+| §12 | `POST` | `/v1/inventory/projects`                         | `connectProject`    | **Live** |
+
+---
+
+### §1 — GET /v1/inventory/stats
+
+Returns tenant-scoped aggregate counts for the Inventory overview header.
+
+**Auth:** Bearer token required.  
+**Response:** `200 InventoryStats`
+
+```
+GET /v1/inventory/stats
+Authorization: Bearer <token>
+```
+
+**Response shape** (`InventoryStats`):
+
+| Field       | Type                                            | Description                                          |
+| ----------- | ----------------------------------------------- | ---------------------------------------------------- |
+| `attention` | `number`                                        | Assets with ≥1 flag + projects with findings > 0     |
+| `byType`    | `{ project, skill, mcp, hook, config: number }` | Asset counts per type                                |
+| `harnesses` | `number`                                        | Inventory harness rows                               |
+| `mcpTrust`  | `{ known-good, risky, unapproved: number }`     | Effective MCP trust distribution (overrides applied) |
+
+Empty tenant always returns all-zero counts (never 404).
+
+---
+
+### §2 — GET /v1/inventory/harnesses
+
+Returns the tenant's harness-tree — one `HarnessSummary` per discovered harness row, each
+embedding its linked projects and categorized assets.
+
+**Auth:** Bearer token required.  
+**Query params:**
+
+| Param | Type     | Description                                                                                                 |
+| ----- | -------- | ----------------------------------------------------------------------------------------------------------- |
+| `q`   | `string` | Optional. Filters by asset `name`/`sub` (case-insensitive). Harnesses with no matching assets are excluded. |
+
+**Response:** `200 ListHarnessesResponse`
+
+```
+GET /v1/inventory/harnesses?q=notion
+Authorization: Bearer <token>
+```
+
+**Response shape** (`ListHarnessesResponse`):
+
+```json
+{
+  "items": [
+    {
+      "id": "claudecode",
+      "label": "Claude Code",
+      "kind": "claude_code",
+      "version": "1.2.0",
+      "sessions": 42,
+      "assetCount": 3,
+      "flagCount": 1,
+      "projects": [ { "id": "...", "name": "payments-api", "..." } ],
+      "categories": [
+        { "type": "mcp",   "assets": [ { "id": "...", "name": "notion-bridge", "trust": "unapproved", "..." } ] },
+        { "type": "skill", "assets": [ { "..." } ] }
+      ]
+    }
+  ]
+}
+```
+
+- `categories[]` are ordered **config → skill → mcp → hook**; the `project` type never appears.
+- `projects[]` uses the same `ProjectSummary` shape as §5 (coalesced nullable columns, effective `accessCounts`).
+- `assetCount` and `flagCount` exclude projects.
+- Empty inventory returns `{ items: [] }` (never 404).
+
+The harness `id` field is mapped from the `provider` key in the inventory `attributes` JSON
+(`claudecode | cursor | codex`). Inventory rows with unrecognized providers are silently skipped.
+
+---
+
+### §3 — GET /v1/inventory/assets
+
+Returns all non-project assets grouped by type, with flag and trust rollups.
+
+**Auth:** Bearer token required.  
+**Query params:**
+
+| Param  | Type       | Description                                                                                   |
+| ------ | ---------- | --------------------------------------------------------------------------------------------- |
+| `type` | `string[]` | Optional. Repeatable (`?type=mcp&type=skill`). Restricts groups returned. Absent = all types. |
+| `q`    | `string`   | Optional. Free-text filter on asset `name`/`sub` (case-insensitive).                          |
+
+**Response:** `200 ListAssetsResponse`
+
+```
+GET /v1/inventory/assets?type=mcp&type=skill&q=notion
+Authorization: Bearer <token>
+```
+
+**Response shape** (`ListAssetsResponse`):
+
+```json
+{
+  "groups": [
+    {
+      "type": "mcp",
+      "total": 2,
+      "trustRollup": { "known-good": 1, "unapproved": 1 },
+      "flagRollup": { "stale": 1 },
+      "items": [ { "id": "...", "name": "notion-bridge", "trust": "unapproved", "..." } ]
+    },
+    {
+      "type": "skill",
+      "total": 3,
+      "flagRollup": {},
+      "items": [ { "..." } ]
+    }
+  ]
+}
+```
+
+- `trustRollup` is present **only for the `mcp` group** and omitted for all others.
+- `flagRollup` is partial — only flag keys with non-zero counts are included.
+- `project` type never appears in groups.
+- No matches → `{ groups: [] }` (never 404).
+
+---
+
+### §4 — GET /v1/inventory/assets/:assetId
+
+Returns full detail for a single asset.
+
+**Auth:** Bearer token required.  
+**Path params:** `assetId` — the asset id.  
+**Response:** `200 AssetDetail` or `404 asset_not_found`
+
+```
+GET /v1/inventory/assets/mcp-notion-abc123
+Authorization: Bearer <token>
+```
+
+**Response shape** (`AssetDetail`):
+
+```json
+{
+  "id": "mcp-notion-abc123",
+  "type": "mcp",
+  "name": "notion-bridge",
+  "sub": "v2",
+  "flags": ["stale"],
+  "description": "Notion integration MCP server",
+  "trust": "unapproved",
+  "meta": { "server": "http://localhost:3000" },
+  "finding": null,
+  "tools": [
+    {
+      "name": "search",
+      "signature": "search(q)",
+      "description": "...",
+      "write": false,
+      "risk": "proxy-blocked"
+    }
+  ]
+}
+```
+
+- `trust` and `tools[]` are present **only for `mcp` assets**; `trust` is `null` for all other types and `tools` is absent.
+- `trust` reflects effective trust: `mcp_trust_override.trust ?? inventory_asset.trust`.
+- For an `unapproved` MCP, every tool's `risk` is non-null (the proxy blocks all calls); for other trust levels, `risk` reflects the individual tool's stored value (may be `null`).
+- `finding` is always present — an object when an active finding exists, `null` otherwise.
+  **Note:** `finding` is always `null` in this milestone. The findings JOIN is deferred and will populate once the §findings linkage lands in a later PR.
+- Unknown `assetId` → `404 { "error": { "code": "asset_not_found" } }`.
+
+---
+
+### §5 — GET /v1/inventory/projects
+
+Returns the tenant's connected source projects with per-project file access counts
+and findings counts. Access counts reflect effective access (file overrides applied).
+
+**Auth:** Bearer token required.  
+**Query params:**
+
+| Param | Type     | Description                                            |
+| ----- | -------- | ------------------------------------------------------ |
+| `q`   | `string` | Optional. Free-text filter on `name` and `repo` (URL). |
+
+**Response:** `200 ListProjectsResponse`
+
+```
+GET /v1/inventory/projects?q=payments
+Authorization: Bearer <token>
+```
+
+**Response shape** (`ListProjectsResponse`):
+
+```json
+{
+  "items": [
+    {
+      "id": "...",
+      "name": "payments-api",
+      "repo": "https://github.com/acme/payments-api",
+      "visibility": "private",
+      "language": "TypeScript",
+      "policyDefault": "approved",
+      "updatedAt": "2026-06-30T00:00:00.000Z",
+      "accessCounts": { "open": 120, "approved": 30, "blocked": 5, "total": 155 },
+      "findingsCount": 3
+    }
+  ]
+}
+```
+
+`accessCounts` reflects effective access (file-level overrides applied, not just
+stored defaults). `findingsCount` is the sum of `project_file.findingsCount` across
+all files. Empty tenant returns `{ items: [] }` (never 404).
+
+The field-level contract is defined by `ProjectSummary` in
+`packages/schema/src/zod/inventory.ts`; the generated TypeScript types and OpenAPI
+`$ref` entries are the authoritative reference for remaining planned endpoints.
+
+---
+
+### §6 — GET /v1/inventory/projects/:projectId/tree
+
+Browse or search the file tree of a connected source project.
+
+**Auth:** Bearer token required.  
+**Path params:**
+
+| Param       | Type     | Description        |
+| ----------- | -------- | ------------------ |
+| `projectId` | `string` | Source project id. |
+
+**Query params:**
+
+| Param  | Type     | Description                                                                                                                                       |
+| ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `path` | `string` | Optional. Directory prefix for browse mode (default `""`= root).                                                                                  |
+| `q`    | `string` | Optional. Non-empty free-text search query. When non-empty, activates search mode (returns flat file list). Absent or empty string → browse mode. |
+
+**Modes:**
+
+- **Browse mode** (`q` absent or `q=""`): returns files at the given `path` level plus folder summaries for immediate sub-directories. Folder `accessCounts` are computed from all descendants.
+- **Search mode** (`q` non-empty): returns a flat list of files whose `path` or `name` matches the query (case-insensitive). `folders` is omitted.
+
+**Response:** `200 ProjectTreeResponse` | `401 Unauthorized` | `404 project_not_found`
+
+```
+GET /v1/inventory/projects/proj-abc/tree?path=src
+Authorization: Bearer <token>
+```
+
+**Browse-mode response shape:**
+
+```json
+{
+  "project": {
+    "id": "proj-abc",
+    "name": "payments-api",
+    "visibility": "private",
+    "language": "TypeScript"
+  },
+  "path": "src",
+  "files": [
+    {
+      "path": "src/main.ts",
+      "name": "main.ts",
+      "origin": "source",
+      "access": "approved",
+      "isCustom": false,
+      "findings": 0
+    }
+  ],
+  "folders": [
+    {
+      "name": "config",
+      "path": "src/config",
+      "fileCount": 2,
+      "accessCounts": { "open": 0, "approved": 1, "blocked": 1 }
+    }
+  ]
+}
+```
+
+**Search-mode response shape** (`?q=aws`):
+
+```json
+{
+  "project": {
+    "id": "proj-abc",
+    "name": "payments-api",
+    "visibility": "private",
+    "language": "TypeScript"
+  },
+  "path": "",
+  "files": [
+    {
+      "path": "src/config/aws.ts",
+      "name": "aws.ts",
+      "origin": "config",
+      "access": "approved",
+      "isCustom": true,
+      "findings": 0
+    }
+  ]
+}
+```
+
+`isCustom` is `true` when a file-level access override exists AND differs from the computed default. `blockedAt` and `note` appear only when set.
+
+---
+
+### §7 — GET /v1/inventory/projects/:projectId/files
+
+Retrieve full detail for a single file within a connected source project.
+
+**Auth:** Bearer token required.  
+**Path params:**
+
+| Param       | Type     | Description        |
+| ----------- | -------- | ------------------ |
+| `projectId` | `string` | Source project id. |
+
+**Query params:**
+
+| Param  | Type     | Description                                                     |
+| ------ | -------- | --------------------------------------------------------------- |
+| `path` | `string` | Required. File path (e.g. `src/main.ts`). Empty string → `400`. |
+
+**Response:** `200 FileDetail` | `400 missing_path` | `401 Unauthorized` | `404 project_not_found` | `404 file_not_found`
+
+```
+GET /v1/inventory/projects/proj-abc/files?path=src%2Fmain.ts
+Authorization: Bearer <token>
+```
+
+**Response shape (`FileDetail`):**
+
+```json
+{
+  "path": "src/main.ts",
+  "name": "main.ts",
+  "origin": "source",
+  "defaultAccess": "approved",
+  "access": "approved",
+  "isCustom": false,
+  "findings": 0,
+  "findingsRefs": [],
+  "project": {
+    "id": "proj-abc",
+    "name": "payments-api",
+    "visibility": "private",
+    "language": "TypeScript",
+    "policyDefault": "approved",
+    "updatedAt": "2026-06-30T00:00:00.000Z"
+  }
+}
+```
+
+`findingsRefs` is always `[]` in this milestone (findings JOIN deferred to a future PR).  
+`blockedAt` (ISO 8601) and `note` appear only when set.
+
+---
+
+### §8 — PUT /v1/inventory/projects/:projectId/files/access
+
+Set (or clear) a per-file access override for a source project file. When the requested
+`access` value equals the file's computed default, the override is deleted (clear-on-default).
+
+**Auth:** Bearer token required. Requires a writable role (`owner`, `admin`, or `member`). `security_viewer` → `403 forbidden`.
+
+**Path params:**
+
+| Param       | Type     | Description        |
+| ----------- | -------- | ------------------ |
+| `projectId` | `string` | Source project id. |
+
+**Request body (`SetFileAccessBody`):**
+
+| Field    | Type                                | Description                     |
+| -------- | ----------------------------------- | ------------------------------- |
+| `path`   | `string`                            | File path within the project.   |
+| `access` | `"open" \| "approved" \| "blocked"` | Desired effective access level. |
+
+**Response:** `200 SetFileAccessResponse` | `400 VALIDATION_ERROR` | `401 Unauthorized` | `403 forbidden` | `404 project_not_found` | `404 file_not_found`
+
+```
+PUT /v1/inventory/projects/proj-abc/files/access
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "path": "src/main.ts", "access": "blocked" }
+```
+
+**Response shape (`SetFileAccessResponse`):**
+
+```json
+{
+  "file": {
+    "path": "src/main.ts",
+    "name": "main.ts",
+    "origin": "source",
+    "access": "blocked",
+    "isCustom": true,
+    "findings": 0
+  },
+  "accessCounts": {
+    "open": 3,
+    "approved": 1,
+    "blocked": 1,
+    "total": 5
+  }
+}
+```
+
+`isCustom` is `true` when the override differs from the computed default; `false` when the
+override was cleared (requested `access` matched the default).
+
+---
+
+### §9 — PUT /v1/inventory/assets/:assetId/trust
+
+Set (or clear) a per-asset MCP trust override. When the requested `trust` value equals the
+asset's base trust, the override is deleted (clear-on-default). Only applicable to assets
+with `type = "mcp"`.
+
+**Auth:** Bearer token required. Requires a writable role (`owner`, `admin`, or `member`). `security_viewer` → `403 forbidden`.
+
+**Path params:**
+
+| Param     | Type     | Description |
+| --------- | -------- | ----------- |
+| `assetId` | `string` | Asset id.   |
+
+**Request body (`SetMcpTrustBody`):**
+
+| Field   | Type                                      | Description          |
+| ------- | ----------------------------------------- | -------------------- |
+| `trust` | `"known-good" \| "risky" \| "unapproved"` | Desired trust level. |
+
+**Response:** `200 AssetDetail` | `400 VALIDATION_ERROR` | `400 not_an_mcp_server` | `401 Unauthorized` | `403 forbidden` | `404 asset_not_found`
+
+```
+PUT /v1/inventory/assets/asset-abc/trust
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "trust": "known-good" }
+```
+
+The response is the full `AssetDetail` shape (see §4). When `trust` is `"unapproved"`, all
+`tools[].risk` fields are non-null (populated with a default warning if not set in the source
+data). `isCustom` is implied by `effectiveTrust ≠ baseTrust`; the response does not include
+a separate flag.
+
+---
+
+### §10 — GET /v1/inventory/harnesses/:harnessId/events
+
+Returns enforcement events for a specific harness. Events are merged from two internal
+sources (legacy `findings+events` and new `inspection_findings+audit_events`), deduplicated
+on a per-second / action / file key (new-system row wins), sorted newest-first, and sliced
+to `limit`.
+
+**Auth:** Bearer token required.
+
+**Path params:**
+
+| Param       | Type     | Description                                                                          |
+| ----------- | -------- | ------------------------------------------------------------------------------------ |
+| `harnessId` | `string` | Harness identifier: `claudecode`, `cursor`, or `codex`. Unknown values return `404`. |
+
+**Query params:**
+
+| Param   | Type     | Default | Description                                                                          |
+| ------- | -------- | ------- | ------------------------------------------------------------------------------------ |
+| `limit` | `number` | `7`     | Maximum events to return. Range: 1–50. Validated by Zod — `0` or `>50` return `400`. |
+
+**Response:** `200 HarnessEventsResponse` | `400 VALIDATION_ERROR` | `401 Unauthorized` | `404 harness_not_found`
+
+```
+GET /v1/inventory/harnesses/claudecode/events?limit=20
+Authorization: Bearer <token>
+```
+
+**Response shape** (`HarnessEventsResponse`):
+
+| Field    | Type                                              | Description                                          |
+| -------- | ------------------------------------------------- | ---------------------------------------------------- |
+| `counts` | `{ block: number; redact: number; warn: number }` | Action-taken counts across the returned `items` only |
+| `items`  | `HarnessEventItem[]`                              | Events sorted DESC by `occurredAt`, sliced to limit  |
+
+**`HarnessEventItem` shape:**
+
+| Field        | Type                            | Description                        |
+| ------------ | ------------------------------- | ---------------------------------- |
+| `kind`       | `"block" \| "redact" \| "warn"` | Action taken on this event         |
+| `title`      | `string`                        | Category label (e.g. `"secret"`)   |
+| `detail`     | `string`                        | File path if available; `""`       |
+| `occurredAt` | `string` (ISO 8601)             | When the event occurred            |
+| `findingId`  | `string \| null` (optional)     | Source finding id for traceability |
+
+---
+
+### §11 — POST /v1/inventory/rescan
+
+Triggers an inventory rescan (stub implementation). Returns `202 Accepted` with a job id
+on the first call. Subsequent calls within the same process lifetime return `409 scan_in_progress`
+until the process restarts. This is a scaffolded endpoint — the actual rescan worker is not
+yet implemented.
+
+**Auth:** Bearer token required. Requires a writable role. `security_viewer` → `403 forbidden`.
+
+**Request body:** none
+
+**Response:** `202 RescanResponse` | `401 Unauthorized` | `403 forbidden` | `409 scan_in_progress`
+
+```
+POST /v1/inventory/rescan
+Authorization: Bearer <token>
+```
+
+**`202 RescanResponse` shape:**
+
+| Field       | Type                | Description                      |
+| ----------- | ------------------- | -------------------------------- |
+| `jobId`     | `string`            | Unique job identifier (`scan_…`) |
+| `startedAt` | `string` (ISO 8601) | When the scan was accepted       |
+
+---
+
+### §12 — POST /v1/inventory/projects
+
+Connects a new GitHub repository to the tenant's inventory. The `repo` body field must be
+in `owner/name` format (no leading slash, exactly one `/`). A `https://github.com/` URL is
+constructed server-side. Returns `409 project_exists` when a project with the same URL is
+already registered for the tenant.
+
+**Auth:** Bearer token required. Requires a writable role. `security_viewer` → `403 forbidden`.
+
+**Request body (`ConnectProjectBody`):**
+
+| Field  | Type     | Description                                 |
+| ------ | -------- | ------------------------------------------- |
+| `repo` | `string` | Repository in `owner/name` format (GitHub). |
+
+**Response:** `201 ProjectSummary` | `400 invalid_repo` | `401 Unauthorized` | `403 forbidden` | `409 project_exists`
+
+```
+POST /v1/inventory/projects
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{ "repo": "acme/payments-service" }
+```
+
+The response is the full `ProjectSummary` shape (see §5). Newly connected projects have
+zeroed `accessCounts` and `findingsCount` (no files seeded yet). `visibility` is coalesced
+to `"private"` and `policyDefault` to `"approved"` until updated.
 
 ---
 

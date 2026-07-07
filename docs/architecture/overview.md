@@ -138,6 +138,8 @@ The plugin stores this in memory and uses it to resolve actions without a round-
 
 The dashboard is a React SPA that calls the backend's REST API via TanStack Query. It builds to `apps/backend/public/` so the production container serves both the API and the UI from a single port.
 
+The OSS **web-ui** (`apps/web-ui`, Next.js) mirrors the enterprise dashboard's look and feel but reads the local SQLite store directly through `@alsoknownassecurity/persistence` in Server Components — no `@alsoknownassecurity/client`, no HTTP, no rule registry. Both apps render the same presentational `*View` components from `@alsoknownassecurity/dashboard-ui`; enterprise-only affordances are injected as optional props (e.g. `FindingDetailView`'s `footer`, `DetectionDetailView`'s action callbacks). The **Detections** page adds a matching OSS read path (`db().detections` — list/detail/stats over `installed_packs`, reusing the pure `buildDetectionsList` / `rowToDetectionDetail` builders from `@alsoknownassecurity/schema` so shapes never drift from the hosted contract) plus the web-ui's **first local write path**: changing a detection's enforcement policy (or toggling it) is a Next.js Server Action that calls the persistence write facade and `revalidatePath`s the page. Import-from-library and pulling upstream updates remain enterprise-only (they require the registry).
+
 ## API client generation
 
 `@alsoknownassecurity/client` is **generated**, not hand-maintained. The contract flows one way:

@@ -18,6 +18,7 @@ apps/plugin-claude-code/
 │   ├── findings.md      #   /aka:findings  — recent findings (masked)
 │   ├── recommend.md     #   /aka:recommend — top recommendations
 │   ├── audit.md         #   /aka:audit     — recent enforcement decisions
+│   ├── scan.md          #   /aka:scan      — scan working tree for code flaws
 │   └── tokens.md        #   /aka:tokens    — token usage + estimated cost
 └── scripts/*.js         # built scripts (tsup output, self-contained):
                          #   hooks + query.js (read surface) + dashboard.js + onboard.js
@@ -110,6 +111,7 @@ Findings persist locally to a SQLite store at `~/.aka/data/aka.db`, so the plugi
 | `/aka:findings`  | recent findings with rule, category, severity, action, and the **masked** match |
 | `/aka:recommend` | findings grouped by category (ranked by severity, then frequency) + next steps  |
 | `/aka:audit`     | the decision log — recent detections and the action AKA took                    |
+| `/aka:scan`      | scan working-tree source files for insecure code patterns (OWASP Top 10)        |
 | `/aka:tokens`    | token usage per provider/model (reconciled from transcripts) + estimated cost   |
 
 The raw matched secret is **never** stored or shown — only a masked form. All are read-only; they never mutate the database. They also work directly:
@@ -117,6 +119,14 @@ The raw matched secret is **never** stored or shown — only a masked form. All 
 ```bash
 node apps/plugin-claude-code/scripts/query.js findings
 ```
+
+`/aka:scan` re-runs are cheap: every scanned file — including clean ones — is tracked in a local scan ledger (path + mtime + content hash), so an unchanged file is skipped without even being re-read. The ledger is keyed to a fingerprint of the active detection ruleset, so installing or updating a rule pack automatically rescans everything; findings themselves are deduplicated by content hash, so a re-run never duplicates them.
+
+Files excluded by the repo's `.gitignore` are **still scanned** — local scratch and generated files are a common hiding place for real secrets — but their events carry `metadata.gitignored: true` and the scan summary reports those findings as informational, leaving enforcement policy to decide how loudly to treat them.
+
+To exclude paths from scanning **entirely**, add a `.akaignore` file (gitignore syntax, honored at any directory level, deeper files and `!` negations override shallower ones). Unlike `.gitignore` it is a hard skip: matching files are never read, never ledgered, and produce no findings. A `.akaignore` negation also overrides the scanner's built-in default skip list (`node_modules`, `dist`, `vendor`, `target`, …) — e.g. `!vendor/` re-includes first-party code that lives under `vendor/`. The two files compose: `.gitignore` decides how loudly a finding is reported, `.akaignore` decides whether the file is looked at at all.
+
+`/aka:scan --discover` (the multi-repo sweep) searches for git repositories under the **current directory** by default — never the home directory implicitly. A broader sweep requires an explicit `--root <path>` (e.g. `--root ~`), which the `/aka:scan` command only passes after naming the scope to the user and getting confirmation; `--depth <n>` bounds the recursion (default 4). In **attached** mode `--discover` is additionally refused outright: it would send findings from every discovered repo to the configured backend, so it requires an explicit `--allow-attached` opt-in, again only after user confirmation. Single-project scans remain available in attached mode, and scan/backfill ingest is marked `dedupe: content-hash` so a re-run never duplicates events on the backend.
 
 ### `/aka:dashboard` — the web dashboard
 
