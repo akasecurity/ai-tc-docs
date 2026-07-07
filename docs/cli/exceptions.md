@@ -16,6 +16,7 @@ flags, and AKA blocks it. The block message in the transcript looks like this:
 AKA blocked this prompt — flagged secrets/aws-access-key (A******E). Remove the flagged content and resubmit.
 If this is intentional and you accept the risk, grant an exception:
   aka exception approve 3f2a91       (asks for scope + reason, then resubmit)
+  aka exception approve <value>      (same flow, pasting the blocked value itself)
 More: aka exception --help
 ```
 
@@ -27,7 +28,9 @@ Reading it:
 - **The escape hatch** — the `aka exception approve 3f2a91` line. `3f2a91` is a
   short-lived reference to the block that just happened (kept for 30 minutes),
   so the command already knows _which value_ you mean — you never retype or
-  paste the secret anywhere.
+  paste the secret anywhere. Pasting the blocked value in place of the
+  reference works too (it is matched by fingerprint, never stored), at the
+  cost of the value landing in your shell history.
 
 When AKA **redacts** instead of blocking, the warning carries the same pointer:
 redacted values can be excepted through the identical flow.
@@ -41,7 +44,10 @@ aka exception approve 3f2a91
 ```
 
 (Ran out of the 30-minute window, or lost the reference? Plain
-`aka exception approve` lists your recent blocks to pick from.)
+`aka exception approve` lists your recent blocks to pick from. You can also
+paste the blocked value itself in place of the reference — it is matched by
+its keyed fingerprint, never stored or echoed. Just note that anything typed
+on a command line lands in your shell history; the reference avoids that.)
 
 The command asks two questions.
 
