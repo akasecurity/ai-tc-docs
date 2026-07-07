@@ -160,6 +160,16 @@ Detects insecure code patterns across Python, JS/TS, Java, Ruby, PHP, and .NET. 
 | `ssrf-user-url`             | high     | regex   | `fetch`/`axios`/`requests.get` called directly with `req.*`/`params.*`                          |
 | `regex-redos-backtrack`     | medium   | regex   | Catastrophic backtracking patterns like `(a+)+`                                                 |
 
+## config-posture
+
+Structural rules over the plugin's [configuration-inventory scan](../plugin/claude-code.md#configuration-inventory-scan-skills--hooks) (skills & hooks), evaluated once per session on `SessionStart`. Unlike the text packs above, these compare hook entries against each other, so they live as pure functions in `packages/detections/src/posture/` (fixture-tested like every pack) rather than in the regex rule format. Findings are observational (`warn`) and power the hook status/warning lines on the config read surface.
+
+| Rule                   | Severity | Fires when                                                                                                     |
+| ---------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `hook-conflict`        | medium   | Two hooks on the same event with overlapping matchers both mutate the tool target — run order is undefined     |
+| `hook-unknown`         | medium   | A settings-scope hook's command is attributable to no installed plugin and no recognizable tool (v1 heuristic) |
+| `hook-external-egress` | high     | A hook command contains network-egress primitives (`curl`, `wget`, `nc`, `ssh`, …) or a URL                    |
+
 ## Running the test suite
 
 ```bash
