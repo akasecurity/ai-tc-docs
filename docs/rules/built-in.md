@@ -75,7 +75,7 @@ Detects credentials and tokens that should never be shared with AI models. 21 ru
 
 **Location:** `rules/secrets-infra/`
 
-Detects infrastructure-level secrets and credentials. 13 rules.
+Detects infrastructure-level secrets and credentials. 12 rules.
 
 | Rule ID                       | Severity | Matcher | Post-Validators | Description                                              |
 | ----------------------------- | -------- | ------- | --------------- | -------------------------------------------------------- |
@@ -90,7 +90,6 @@ Detects infrastructure-level secrets and credentials. 13 rules.
 | `password-field`              | high     | keyword | —               | JSON/YAML password/secret/token fields                   |
 | `docker-config-auth`          | critical | regex   | —               | Docker `config.json` base64 auth                         |
 | `kubeconfig-token`            | critical | regex   | —               | Kubernetes kubeconfig embedded tokens                    |
-| `api-key-header`              | high     | regex   | `entropy`       | API keys in `x-api-key`/`api-key`/`apikey` headers       |
 | `generic-high-entropy-secret` | high     | regex   | `entropy`       | High-entropy values on credential-shaped keys (fallback) |
 
 ## core-phi
