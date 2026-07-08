@@ -11,6 +11,7 @@ What you get:
 - `aka init` — set up your local AKA home
 - `aka scan` — scan files/directories for secrets & sensitive data
 - `aka stats` — print findings/enforcement aggregates
+- `aka detections` — list installed detection packs + apply updates (manual)
 - `aka dashboard` — open the local web dashboard
 - `aka tui` — an interactive terminal dashboard
 - `aka plugins` — install/manage agent plugins (Claude Code, …)
@@ -159,6 +160,29 @@ aka stats --range 7d   # windows ONLY the enforcement section
 `--range` accepts `7d | 30d | 3m | 6m` and scopes **only** the enforcement aggregates —
 findings-by-severity and the latest findings are always all-time. An unrecognized value
 silently falls back to `30d` (it doesn't error).
+
+---
+
+## Manage detection packs
+
+```bash
+aka detections                    # list installed packs + available updates
+aka detections update --all       # apply every pending update
+aka detections update <pack-id>   # apply one (accepts `secrets` or `aka/secrets`)
+```
+
+`aka detections` prints one row per installed pack: installed version, the latest
+version this CLI ships, rule count, enabled state, assigned enforcement policy,
+and whether an update is available.
+
+Detection updates are **manual by design**. Upgrading the CLI or plugin only
+records what's newly _available_ — the packs you have installed keep running
+unchanged (same rules, same versions) until you apply the update yourself with
+`aka detections update` or the dashboard's **Update** button. `aka init` and the
+plugin's session hooks install packs you don't have yet (new packs arrive
+enabled under the log-only _monitor_ policy), but they **never modify** an
+installed pack; your enabled/disabled choices and policy assignments always
+survive an update.
 
 ---
 

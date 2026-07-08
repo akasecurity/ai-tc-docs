@@ -118,8 +118,11 @@ Findings persist locally to a SQLite store at `~/.aka/data/aka.db`, so the plugi
 | `/aka:scan`       | scan working-tree source files for insecure code patterns (OWASP Top 10)        |
 | `/aka:tokens`     | token usage per provider/model (reconciled from transcripts) + estimated cost   |
 | `/aka:exceptions` | active detection exceptions — masked value, rule, scope, expiry, uses           |
+| `/aka:detections` | installed detection packs — version, rules, enabled, policy, update available   |
 
 `/aka:exceptions` is deliberately **read-only**: creating, approving, or revoking an exception happens only out-of-band in a terminal via the `aka` CLI, never from inside a Claude Code session — the session being policed must not be able to grant its own bypass.
+
+`/aka:detections` is read-only for the same reason: it shows each pack's installed version against the latest one the running plugin ships, and whether an update is pending — but **applying** an update happens out-of-band, via `aka detections update` in a terminal or the dashboard's **Update** button. Detection updates are never applied automatically: a plugin upgrade records what's newly available, and the installed packs keep scanning unchanged until you update them. The plugin scans with the **installed snapshot** (enabled packs only), so both the enable/disable toggle and pack versions genuinely control what runs.
 
 ## When a detection blocks: exception guidance
 
