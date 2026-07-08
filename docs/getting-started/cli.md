@@ -249,6 +249,26 @@ sync land in a later release.
 
 ---
 
+## Shell tab-completion
+
+Turn on `<TAB>` completion for `aka` — type `aka exc<TAB>` and your shell fills in
+`aka exception`.
+
+```bash
+# zsh (macOS default)
+echo 'source <(aka completion zsh)' >> ~/.zshrc
+
+# bash
+echo 'source <(aka completion bash)' >> ~/.bashrc
+```
+
+Open a new terminal (or `source` the same line now) and `aka <TAB>` completes
+commands, subcommand verbs (`aka exception <TAB>` → `approve add list …`),
+`aka scan` file paths, and global flags. `aka completion <zsh|bash>` just prints the
+script — you load it into your shell, you don't read it.
+
+---
+
 ## Where things live
 
 | Path                            | What                                                |
