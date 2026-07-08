@@ -2514,6 +2514,187 @@ Powers the header **Harness** filter. No query params.
 
 ---
 
+## Activity API (`/v1/activity`)
+
+> **Status: All 7 endpoints live.**
+
+Self-scoped endpoints backing the dashboard **Activity** page: sessions are **AI-harness runs
+reconstructed from the audit-event log** (Claude Code / Cursor / Codex …), grouped by session and
+shown as a per-session audit timeline. Unlike Inventory/Shares (tenant-wide), every read here
+returns only **the caller's own sessions** — there is no "all users" view for this page yet.
+
+**Tag:** `activity`  
+**Auth:** Bearer token required on every endpoint. `GET /v1/activity/export` additionally
+requires a writable role — `403 forbidden` for `security_viewer` (the codebase's only other
+GET endpoint gated this way is `GET /v1/shares/export`; bulk download is treated as a distinct,
+higher-sensitivity capability from viewing individual records).  
+**Isolation:** every response is scoped to the caller's own sessions; an id belonging to another
+user resolves the same as an unknown one — `404 session_not_found`, never an existence leak.
+
+| #   | Method | Path                                      | operationId            | Status   |
+| --- | ------ | ----------------------------------------- | ---------------------- | -------- |
+| §1  | `GET`  | `/v1/activity/stats`                      | `getActivityStats`     | **Live** |
+| §2  | `GET`  | `/v1/activity/sessions`                   | `listActivitySessions` | **Live** |
+| §3  | `GET`  | `/v1/activity/sessions/:sessionId`        | `getActivitySession`   | **Live** |
+| §4  | `GET`  | `/v1/activity/sessions/:sessionId/events` | `listSessionEvents`    | **Live** |
+| §5  | `GET`  | `/v1/activity/sessions/:sessionId/raw`    | `getSessionRawLog`     | **Live** |
+| §6  | `GET`  | `/v1/activity/export`                     | `exportActivity`       | **Live** |
+| §7  | `GET`  | `/v1/activity/overview`                   | `getActivityOverview`  | **Live** |
+
+Responses are **semantic, not presentational** — no `color`/`icon`/`day`/`fill`/`tone`/`dot`
+fields and no pre-formatted strings (durations, humanized token counts, day labels); the
+frontend derives those client-side from the ISO timestamps, raw integer counts, and stable
+enums below.
+
+---
+
+### §1 — GET /v1/activity/stats
+
+Powers the summary strip — sessions today, live now, tool calls, findings triggered, egress
+events. All five counters are scoped to **today** in the caller's timezone, independent of §2's
+filters.
+
+**Query:** `tz` (optional, IANA timezone string — defines the "today" boundary; omitted
+defaults to UTC).
+
+**Response:** `200 GetActivityStatsResponse`
+
+```json
+{
+  "sessionsToday": 3,
+  "liveNow": 1,
+  "toolCallsToday": 108,
+  "findingsToday": 3,
+  "egressToday": 5
+}
+```
+
+---
+
+### §2 — GET /v1/activity/sessions
+
+Returns a flat, most-recent-first `items[]` of session summaries — day-group headings are
+computed client-side from `startedAt`. Events are not embedded (they load with §3); `q` still
+matches event text server-side.
+
+**Query:**
+
+| Param     | Type           | Description                                                                                            |
+| --------- | -------------- | ------------------------------------------------------------------------------------------------------ |
+| `q`       | `string`       | Optional. Case-insensitive match over session `title`/`project`/`branches` and event `title`/`detail`. |
+| `harness` | `string[]`     | Optional. Repeatable (`?harness=cursor&harness=api`). Omitted = all harnesses.                         |
+| `from`    | `string` (ISO) | Optional. Lower bound on `startedAt`.                                                                  |
+| `to`      | `string` (ISO) | Optional. Upper bound on `startedAt`; omitted defaults to now.                                         |
+| `limit`   | `integer`      | Optional, default `50`, range `1–100`.                                                                 |
+| `cursor`  | `string`       | Optional. Opaque pagination cursor (most-recent-first).                                                |
+
+**Response:** `200 ListActivitySessionsResponse`
+
+```json
+{
+  "items": [
+    {
+      "id": "sess_9f2a71",
+      "harness": "claudecode",
+      "title": "Add idempotency keys to charge & refund",
+      "project": "payments-api",
+      "repo": "goodcode/payments-api",
+      "branches": ["feat/idempotency", "main"],
+      "startedAt": "2026-07-05T14:14:02Z",
+      "endedAt": null,
+      "status": "active",
+      "turns": 14,
+      "findings": 1,
+      "shares": 2
+    }
+  ],
+  "nextCursor": null
+}
+```
+
+`nextCursor` is `null` once the last page is reached.
+
+---
+
+### §3 — GET /v1/activity/sessions/:sessionId
+
+Returns one session's full detail (the §2 summary fields plus `host`/`cwd`/`models`/`version`/
+`tokens`/`tools`/`files`/`commits`) with its audit timeline embedded, oldest → newest.
+
+**Response:** `200 ActivitySession` | `404 session_not_found`
+
+`tokens` reuses the shared `TokenRollup` shape (raw integer `inputTokens`/`outputTokens`/
+`cacheRead`/`cacheCreation`; `estimatedCostUsd` is `null` — no price map wired yet). Each
+`events[]` entry (`AuditEvent`) carries `kind`, `title`, `detail`, and — depending on kind — a
+nullable `tool`/`severity`/`link`/`targetId`, plus always-present `internal`/`flagged` booleans.
+
+---
+
+### §4 — GET /v1/activity/sessions/:sessionId/events
+
+Pagination escape hatch past §3's embedded-events cap, for a single (typically long-running)
+session.
+
+**Query:** `limit` (optional, default `100`, range `1–500`); `cursor` (optional); `order`
+(optional, `asc`|`desc`, default `asc`).
+
+**Response:** `200 ListSessionEventsResponse` (`{ items: AuditEvent[], nextCursor }`) | `404
+session_not_found`
+
+---
+
+### §5 — GET /v1/activity/sessions/:sessionId/raw
+
+Returns the verbatim, pre-reconstruction audit-log records behind one session's timeline —
+redaction has already been applied at capture time.
+
+**Query:** `format` (optional, `ndjson`|`json`, default `ndjson`).
+
+**Response:** `format=ndjson` (default) streams `application/x-ndjson`, one JSON record per
+line. `format=json` returns `{ "records": [...] }` with `application/json`. `404
+session_not_found` for an unknown or not-owned session id.
+
+---
+
+### §6 — GET /v1/activity/export
+
+Downloads the sessions in the current view (honoring §2's `q`/`harness`/`from`/`to` filters)
+flattened to one row per event.
+
+**Auth:** requires a writable role — `403 forbidden` for `security_viewer`.  
+**Query:** `format` (optional, `csv`|`json`, default `csv`) plus §2's `q`/`harness`/`from`/`to`.
+
+**Response:** a file download (`Content-Disposition: attachment`) — `text/csv; charset=utf-8`
+or `application/json; charset=utf-8`. CSV columns, in order:
+`sessionId,harness,project,branch,model,startedAt,status,occurredAt,kind,tool,severity,title,detail`.
+
+---
+
+### §7 — GET /v1/activity/overview
+
+A composite read for the page's initial paint — a fan-out over §1 and §2 (default filters), not
+an independent query path. The granular endpoints remain the source of truth.
+
+**Query:** `tz` (optional — forwarded into the §1 stats window; the sessions half always uses
+§2's own defaults).
+
+**Response:** `200 ActivityOverviewResponse`
+
+```json
+{
+  "stats": {
+    "sessionsToday": 3,
+    "liveNow": 1,
+    "toolCallsToday": 108,
+    "findingsToday": 3,
+    "egressToday": 5
+  },
+  "sessions": { "items": [{ "...": "ActivitySessionSummary" }], "nextCursor": null }
+}
+```
+
+---
+
 ## Planned endpoints
 
 These endpoints are defined in `packages/schema/src/zod/api.ts` but not yet implemented:
