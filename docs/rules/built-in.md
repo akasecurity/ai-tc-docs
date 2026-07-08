@@ -1,12 +1,14 @@
 # Built-in Rules
 
-AKA ships seven rule packs out of the box with over 90 detection rules. All rules include positive and negative fixtures that run as part of the test suite.
+AKA ships seven rule packs out of the box — **101 detection rules** in total. Every pack is bundled into the plugin and installed active by default, under the log-only **Monitor** policy until you assign a stronger action (Warn / Redact / Block) to a detection from the dashboard. All rules include positive and negative fixtures that run as part of the test suite.
+
+**Pack updates are manual.** The plugin scans with your _installed_ snapshot of each pack (enabled packs only). Upgrading the plugin/CLI records the newer packs as _available_ but changes nothing until you apply the update — from the dashboard's Detections page (**Update**), with `aka detections update`, or after reviewing `/aka:detections` in Claude Code. New packs added in a release are auto-installed (monitor-only); packs you already have are never modified automatically, and your enabled/policy choices survive every update.
 
 ## core-pii
 
 **Location:** `rules/core-pii/`
 
-Detects personally identifiable information commonly found in prompts. 13 rules.
+Detects personally identifiable information commonly found in prompts. 14 rules.
 
 | Rule ID              | Severity | Matcher | Description                                               |
 | -------------------- | -------- | ------- | --------------------------------------------------------- |
@@ -23,6 +25,7 @@ Detects personally identifiable information commonly found in prompts. 13 rules.
 | `vin`                | medium   | regex   | Vehicle Identification Numbers (17 chars)                 |
 | `mac-address`        | low      | regex   | MAC addresses (`AA:BB:CC:DD:EE:FF`)                       |
 | `national-id`        | high     | regex   | Multi-country: Aadhaar, UK NI, Canadian SIN               |
+| `zip`                | low      | regex   | US ZIP / ZIP+4 postal codes                               |
 
 ## core-financial
 
@@ -97,12 +100,14 @@ Detects infrastructure-level secrets and credentials. 13 rules.
 
 **Location:** `rules/core-phi/`
 
-Detects protected health information (HIPAA-relevant). 6 rules.
+Detects protected health information (HIPAA-relevant). 8 rules.
 
 | Rule ID            | Severity | Matcher | Description                                                |
 | ------------------ | -------- | ------- | ---------------------------------------------------------- |
 | `mrn`              | high     | regex   | Medical Record Numbers (contextual)                        |
 | `hipaa-identifier` | high     | regex   | Health plan beneficiary / claim numbers                    |
+| `member-id`        | high     | regex   | Health plan member IDs                                     |
+| `group-id`         | high     | regex   | Health plan group IDs                                      |
 | `icd10-code`       | medium   | regex   | ICD-10 diagnosis codes (requires ICD/diagnosis/dx context) |
 | `ndc-code`         | medium   | regex   | National Drug Codes                                        |
 | `genetic-data`     | high     | keyword | DNA/genetic data references                                |
@@ -129,7 +134,7 @@ Detects internal code and infrastructure context that should not leave the organ
 
 **Location:** `rules/code-flaws/`
 
-Detects insecure code patterns across Python, JS/TS, Java, Ruby, PHP, and .NET. Rules fire on both code written by Claude (PreToolUse on `Write`/`Edit`) and existing code read from disk (PostToolUse on `Read`). 28 rules covering OWASP Top 10 and related weaknesses.
+Detects insecure code patterns across Python, JS/TS, Java, Ruby, PHP, and .NET. Rules fire on both code written by Claude (PreToolUse on `Write`/`Edit`) and existing code read from disk (PostToolUse on `Read`). 29 rules covering OWASP Top 10 and related weaknesses.
 
 | Rule ID                     | Severity | Matcher | Description                                                                                     |
 | --------------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------- |
