@@ -75,22 +75,23 @@ Detects credentials and tokens that should never be shared with AI models. 21 ru
 
 **Location:** `rules/secrets-infra/`
 
-Detects infrastructure-level secrets and credentials. 12 rules.
+Detects infrastructure-level secrets and credentials. 13 rules.
 
-| Rule ID                | Severity | Matcher | Post-Validators | Description                                             |
-| ---------------------- | -------- | ------- | --------------- | ------------------------------------------------------- |
-| `ssh-private-key`      | critical | regex   | —               | RSA/DSA/EC/OpenSSH private key blocks                   |
-| `db-connection-string` | critical | regex   | —               | DB URLs with credentials (`postgresql://user:pass@...`) |
-| `jwt-token`            | high     | regex   | `entropy`       | JSON Web Tokens (3-part base64url)                      |
-| `basic-auth-url`       | critical | regex   | —               | HTTP URLs with embedded credentials                     |
-| `basic-auth-header`    | critical | regex   | —               | HTTP Basic auth Authorization headers                   |
-| `pgp-private-key`      | critical | regex   | —               | PGP private key blocks                                  |
-| `bearer-token`         | high     | regex   | `entropy`       | Generic Authorization Bearer tokens                     |
-| `env-key-value`        | high     | keyword | —               | Sensitive env vars with values                          |
-| `password-field`       | high     | keyword | —               | JSON/YAML password/secret/token fields                  |
-| `docker-config-auth`   | critical | regex   | —               | Docker `config.json` base64 auth                        |
-| `kubeconfig-token`     | critical | regex   | —               | Kubernetes kubeconfig embedded tokens                   |
-| `api-key-header`       | high     | regex   | `entropy`       | API keys in `x-api-key`/`api-key`/`apikey` headers      |
+| Rule ID                       | Severity | Matcher | Post-Validators | Description                                              |
+| ----------------------------- | -------- | ------- | --------------- | -------------------------------------------------------- |
+| `ssh-private-key`             | critical | regex   | —               | RSA/DSA/EC/OpenSSH private key blocks                    |
+| `db-connection-string`        | critical | regex   | —               | DB URLs with credentials (`postgresql://user:pass@...`)  |
+| `jwt-token`                   | high     | regex   | `entropy`       | JSON Web Tokens (3-part base64url)                       |
+| `basic-auth-url`              | critical | regex   | —               | HTTP URLs with embedded credentials                      |
+| `basic-auth-header`           | critical | regex   | —               | HTTP Basic auth Authorization headers                    |
+| `pgp-private-key`             | critical | regex   | —               | PGP private key blocks                                   |
+| `bearer-token`                | high     | regex   | `entropy`       | Generic Authorization Bearer tokens                      |
+| `env-key-value`               | high     | keyword | —               | Sensitive env vars with values                           |
+| `password-field`              | high     | keyword | —               | JSON/YAML password/secret/token fields                   |
+| `docker-config-auth`          | critical | regex   | —               | Docker `config.json` base64 auth                         |
+| `kubeconfig-token`            | critical | regex   | —               | Kubernetes kubeconfig embedded tokens                    |
+| `api-key-header`              | high     | regex   | `entropy`       | API keys in `x-api-key`/`api-key`/`apikey` headers       |
+| `generic-high-entropy-secret` | high     | regex   | `entropy`       | High-entropy values on credential-shaped keys (fallback) |
 
 ## core-phi
 
