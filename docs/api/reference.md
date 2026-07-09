@@ -2695,6 +2695,117 @@ an independent query path. The granular endpoints remain the source of truth.
 
 ---
 
+## Operations API (`/v1/operations`)
+
+> **Status: 2 of 7 endpoints live.**
+
+Tenant-wide read endpoints backing the dashboard **Govern → Operations** overview. Unlike
+Activity/My Health (self-scoped to the caller), every read here reflects the **whole tenant
+estate** — no `req.userId` threading, same tenant-wide shape as Inventory/Security.
+
+**Tag:** `operations`  
+**Auth:** Bearer token required on every endpoint.  
+**Isolation:** tenant-wide only (RLS on `tenantId`; no per-user predicate).
+
+| #   | Method | Path                             | operationId                 | Status   |
+| --- | ------ | -------------------------------- | --------------------------- | -------- |
+| §1  | `GET`  | `/v1/operations/summary`         | `getOperationsSummary`      | **Live** |
+| §2  | `GET`  | `/v1/operations/kpis`            | `getOperationsKpis`         | **Live** |
+| §3  | `GET`  | `/v1/operations/activity`        | `listOperationsActivity`    | Planned  |
+| §4  | `GET`  | `/v1/operations/connected-tools` | `listConnectedTools`        | Planned  |
+| §5  | `GET`  | `/v1/operations/top-policies`    | `listTopPolicyDetections`   | Planned  |
+| §6  | `GET`  | `/v1/operations/top-security`    | `listTopSecurityDetections` | Planned  |
+| §7  | `GET`  | `/v1/operations/external-shares` | `listExternalShares`        | Planned  |
+
+Responses are **semantic, not presentational** — no `color`/`icon`/`label`/`tone` fields and no
+pre-formatted strings (counts are raw integers, timestamps are ISO-8601); the frontend derives
+display formatting client-side.
+
+A handful of fields have no measured source this milestone (e.g. `summary.lastSyncAt`,
+`kpis.tokens_saved`) and are served from documented, individually-reviewed curated constants in
+the service layer — the same "curated business fact, not measured" convention as Security's
+`scanCoverage` (`SCAN_COVERAGE`).
+
+---
+
+### §1 — GET /v1/operations/summary
+
+Powers the page subtitle (e.g. _"AI traffic across 5 providers · 6 repositories · last sync 2m
+ago"_). **Not range-scoped** — reflects the current connected estate.
+
+**Query:** none.
+
+**Response:** `200 OperationsSummaryResponse`
+
+```json
+{
+  "providerCount": 5,
+  "repositoryCount": 6,
+  "lastSyncAt": "2026-07-04T20:58:00Z"
+}
+```
+
+`lastSyncAt` is `null` when the tenant has never synced — curated this milestone (no sync-job
+table exists yet to derive a real value from).
+
+---
+
+### §2 — GET /v1/operations/kpis
+
+Powers the four headline stat tiles — a headline value + trend delta, and a sparkline sharing one
+x-axis across all four metrics. Granularity mirrors `GET /v1/security/findings/timeseries`.
+
+**Query:** `range` (see [Shared `range` query parameter](#shared-range-query-parameter); an
+unsupported value fails validation → `400` with `code: "VALIDATION_ERROR"`, same convention as
+every other range-scoped endpoint in this API).
+
+**Response:** `200 OperationsKpisResponse`
+
+```json
+{
+  "granularity": "day",
+  "buckets": [
+    "2026-06-30",
+    "2026-07-01",
+    "2026-07-02",
+    "2026-07-03",
+    "2026-07-04",
+    "2026-07-05",
+    "2026-07-06"
+  ],
+  "metrics": [
+    { "metric": "total_users", "value": 2, "previousValue": 1, "sparkline": [0, 0, 1, 1, 2, 2, 2] },
+    {
+      "metric": "prompts_scanned",
+      "value": 42,
+      "previousValue": 30,
+      "sparkline": [4, 6, 5, 7, 8, 6, 6]
+    },
+    {
+      "metric": "tripped_detections",
+      "value": 3,
+      "previousValue": 2,
+      "sparkline": [0, 1, 0, 1, 1, 0, 0]
+    },
+    { "metric": "tokens_saved", "value": 0, "previousValue": 0, "sparkline": [0, 0, 0, 0, 0, 0, 0] }
+  ]
+}
+```
+
+- `granularity`/`buckets` are the shared `OperationsBucketedSeriesMeta` x-axis (`day` for
+  `7d`/`30d`, `week` for `3m`/`6m`); every metric's `sparkline` is index-aligned to `buckets`
+  (same length, empty buckets present as `0`, never omitted).
+- `previousValue` is the same metric over the immediately preceding window of equal length.
+- `total_users` counts distinct users active (session-root events) in the window — a user active
+  on multiple days counts once toward `value`/`previousValue`, but contributes to every bucket
+  they were active in.
+- `tripped_detections` counts `inspection_findings` (the "new" audit-event pipeline) in the
+  window — not the legacy `findings`/`events` pair.
+- `tokens_saved` is curated (`0`) this milestone — no tenant-wide token-savings source exists yet
+  (only a per-user `my_health` efficiency figure, the wrong grain for this KPI).
+
+---
+
 ## Planned endpoints
 
 These endpoints are defined in `packages/schema/src/zod/api.ts` but not yet implemented:
