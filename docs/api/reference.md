@@ -2697,7 +2697,7 @@ an independent query path. The granular endpoints remain the source of truth.
 
 ## Operations API (`/v1/operations`)
 
-> **Status: 4 of 7 endpoints live.**
+> **Status: 6 of 7 endpoints live.**
 
 Tenant-wide read endpoints backing the dashboard **Govern → Operations** overview. Unlike
 Activity/My Health (self-scoped to the caller), every read here reflects the **whole tenant
@@ -2713,8 +2713,8 @@ estate** — no `req.userId` threading, same tenant-wide shape as Inventory/Secu
 | §2  | `GET`  | `/v1/operations/kpis`            | `getOperationsKpis`         | **Live** |
 | §3  | `GET`  | `/v1/operations/activity`        | `listOperationsActivity`    | **Live** |
 | §4  | `GET`  | `/v1/operations/connected-tools` | `listConnectedTools`        | **Live** |
-| §5  | `GET`  | `/v1/operations/top-policies`    | `listTopPolicyDetections`   | Planned  |
-| §6  | `GET`  | `/v1/operations/top-security`    | `listTopSecurityDetections` | Planned  |
+| §5  | `GET`  | `/v1/operations/top-policies`    | `listTopPolicyDetections`   | **Live** |
+| §6  | `GET`  | `/v1/operations/top-security`    | `listTopSecurityDetections` | **Live** |
 | §7  | `GET`  | `/v1/operations/external-shares` | `listExternalShares`        | Planned  |
 
 Responses are **semantic, not presentational** — no `color`/`icon`/`label`/`tone` fields and no
@@ -2905,6 +2905,113 @@ counts (`providerCount`/`seatCount`) describe the **full connected estate**, nev
 - `providerCount`/`seatCount` are computed over **every** connected provider, before ranking +
   slicing `tools[]` to `limit` — e.g. 5 connected providers with `limit=4` still reports
   `providerCount: 5`.
+
+---
+
+### §5 — GET /v1/operations/top-policies
+
+Powers the "Top policy detections" list — policies ranked by trip count in the window, each
+with a per-bucket `trend` sharing §2's own bucketed x-axis.
+
+**Query:**
+
+| Param   | Type    | Default | Notes                          |
+| ------- | ------- | ------- | ------------------------------ |
+| `range` | enum    | `30d`   | Scopes `hits` + `trend`.       |
+| `limit` | integer | `5`     | `1–20`. Ranked by `hits` desc. |
+
+**Response:** `200 TopPoliciesResponse`
+
+```json
+{
+  "granularity": "day",
+  "buckets": ["2026-06-30", "2026-07-01", "2026-07-02"],
+  "items": [
+    {
+      "id": "b3f1...",
+      "name": "Block secrets",
+      "category": "secret",
+      "action": "block",
+      "hits": 2,
+      "enabled": true,
+      "trend": [1, 0, 1]
+    },
+    {
+      "id": "c4a2...",
+      "name": "phi",
+      "category": "phi",
+      "action": "warn",
+      "hits": 0,
+      "enabled": false,
+      "trend": [0, 0, 0]
+    }
+  ]
+}
+```
+
+- `items[]` are built from every category-targeted `policies` row (`target: {"category": ...}`)
+  for the tenant — a rule-id-targeted policy has no `category` to report and is excluded.
+  `hits`/`trend` come from `inspection_findings` joined to `inspection_definitions.category`,
+  bucketed on the SAME windowStart-anchored axis as §2's `kpis`.
+- **A policy with zero findings in the window is still present** with `hits: 0` and an all-zero
+  `trend` — never omitted (e.g. a disabled or rarely-tripped category).
+- `category` maps the DB's `DetectionCategory` onto the contract's `FindingCategory`
+  (`code_context` → `source_code`, else 1:1). `code_flaw` and `config`-targeted policies have no
+  `FindingCategory` equivalent and are dropped from this list — `code_flaw` findings are
+  surfaced via §6's OWASP taxonomy instead; `config` is observe-only tooling posture, not a data
+  class.
+- `action` maps the DB's `ActionTaken` (`warn`/`redact`/`block`/`allow`/`log`) onto the
+  contract's `PolicyAction` (`warn`/`redact`/`block`/`monitor`) — `log` and `allow` both curate
+  to `monitor` (the closest observe-only reading; `log` mirrors the built-in "Monitor" archetype's
+  own `action: 'log'`).
+- `name` falls back to the resolved `category` when the policy row has no `name` (e.g. the
+  default policies `seedDefaultPolicies` creates are unnamed).
+
+---
+
+### §6 — GET /v1/operations/top-security
+
+Powers the "Top security detections" list — findings bucketed into the OWASP Top 10 (2021),
+ranked by count. Read-only; drill-down deep-links to Security/Findings.
+
+**Query:**
+
+| Param   | Type    | Default | Notes                           |
+| ------- | ------- | ------- | ------------------------------- |
+| `range` | enum    | `30d`   | Scopes `count`.                 |
+| `limit` | integer | `5`     | `1–10`. Ranked by `count` desc. |
+
+**Response:** `200 TopSecurityResponse`
+
+```json
+{
+  "items": [
+    {
+      "id": "owasp_a03",
+      "code": "A03:2021",
+      "name": "Injection",
+      "count": 15,
+      "severity": "critical"
+    },
+    {
+      "id": "owasp_a01",
+      "code": "A01:2021",
+      "name": "Broken Access Control",
+      "count": 4,
+      "severity": "critical"
+    }
+  ]
+}
+```
+
+- Findings are grouped by `inspection_definitions.ruleId`, then mapped through a curated
+  `RULE_ID_TO_OWASP` table (`code-flaws` rule id → OWASP bucket) and summed per bucket.
+- **A rule id with no `RULE_ID_TO_OWASP` entry contributes to NO bucket** — excluded, not
+  zero-filled or folded into a catch-all. A dedicated backend test iterates the real
+  `code-flaws` pack manifest and fails the build if it grows a rule the map doesn't cover.
+- `severity` is the OWASP bucket's own **curated category severity** (a fixed per-bucket value),
+  not derived from any individual finding's own severity, which varies per rule.
+- Not a bucketed series — a single window total per bucket, no `trend`.
 
 ---
 
