@@ -2697,7 +2697,7 @@ an independent query path. The granular endpoints remain the source of truth.
 
 ## Operations API (`/v1/operations`)
 
-> **Status: 2 of 7 endpoints live.**
+> **Status: 4 of 7 endpoints live.**
 
 Tenant-wide read endpoints backing the dashboard **Govern → Operations** overview. Unlike
 Activity/My Health (self-scoped to the caller), every read here reflects the **whole tenant
@@ -2711,8 +2711,8 @@ estate** — no `req.userId` threading, same tenant-wide shape as Inventory/Secu
 | --- | ------ | -------------------------------- | --------------------------- | -------- |
 | §1  | `GET`  | `/v1/operations/summary`         | `getOperationsSummary`      | **Live** |
 | §2  | `GET`  | `/v1/operations/kpis`            | `getOperationsKpis`         | **Live** |
-| §3  | `GET`  | `/v1/operations/activity`        | `listOperationsActivity`    | Planned  |
-| §4  | `GET`  | `/v1/operations/connected-tools` | `listConnectedTools`        | Planned  |
+| §3  | `GET`  | `/v1/operations/activity`        | `listOperationsActivity`    | **Live** |
+| §4  | `GET`  | `/v1/operations/connected-tools` | `listConnectedTools`        | **Live** |
 | §5  | `GET`  | `/v1/operations/top-policies`    | `listTopPolicyDetections`   | Planned  |
 | §6  | `GET`  | `/v1/operations/top-security`    | `listTopSecurityDetections` | Planned  |
 | §7  | `GET`  | `/v1/operations/external-shares` | `listExternalShares`        | Planned  |
@@ -2803,6 +2803,108 @@ every other range-scoped endpoint in this API).
   window — not the legacy `findings`/`events` pair.
 - `tokens_saved` is curated (`0`) this milestone — no tenant-wide token-savings source exists yet
   (only a per-user `my_health` efficiency figure, the wrong grain for this KPI).
+
+---
+
+### §3 — GET /v1/operations/activity
+
+Powers the "Recent activity" feed — the newest enforcement/scan/policy events. **Not
+range-scoped** (a recency feed, capped by `limit`).
+
+**Query:**
+
+| Param   | Type    | Default | Notes   |
+| ------- | ------- | ------- | ------- |
+| `limit` | integer | `7`     | `1–50`. |
+
+**Response:** `200 OperationsActivityResponse`
+
+```json
+{
+  "items": [
+    {
+      "id": "finding_01HZX",
+      "kind": "block",
+      "severity": "critical",
+      "title": "Blocked a secret in a prompt",
+      "detail": "payments-api",
+      "actor": { "type": "user", "id": "user_maya-chen", "name": "maya@example.com" },
+      "provider": "claudecode",
+      "timestamp": "2026-07-04T20:56:00Z"
+    },
+    {
+      "id": "evt_01HZW",
+      "kind": "scan",
+      "severity": null,
+      "title": "Configuration scan completed",
+      "detail": "payments-api",
+      "actor": { "type": "system", "name": "System" },
+      "provider": "claudecode",
+      "timestamp": "2026-07-04T20:50:00Z"
+    }
+  ]
+}
+```
+
+- `items[]` are ordered newest → oldest and merged from two real, queried sources:
+  detection-derived rows (`inspection_findings` whose `actionTaken` is an enforcement action —
+  `block`/`redact`/`warn` — joined to their parent `audit_events`/`inspection_definitions`) and
+  event-derived rows (`audit_events` with `eventType` `config_scan` → `scan` or `share` → `share`).
+- `actor.type` is `user` (with `id` + an email resolved via the catalog, falling back to the raw
+  id) for a detection-derived row — the event that tripped the finding always has a real user —
+  and `system` (no `id`) for an event-derived row (a config scan / egress detection is an
+  automated process, never a user click).
+- `kind` values `policy` and `connect` have no queryable source yet (no policy-edit audit trail,
+  no tool-connect event) — the contract still declares them for a future/fixture producer.
+
+---
+
+### §4 — GET /v1/operations/connected-tools
+
+Powers the "Connected LLM tools" card — providers with posture, seats, and prompt volume. Header
+counts (`providerCount`/`seatCount`) describe the **full connected estate**, never capped by
+`limit`.
+
+**Query:**
+
+| Param   | Type    | Default | Notes                                           |
+| ------- | ------- | ------- | ----------------------------------------------- |
+| `range` | enum    | `30d`   | Scopes `promptCount`.                           |
+| `limit` | integer | `4`     | `1–20`. `tools[]` ranked by `promptCount` desc. |
+
+**Response:** `200 ConnectedToolsResponse`
+
+```json
+{
+  "providerCount": 2,
+  "seatCount": 42,
+  "tools": [
+    {
+      "provider": "claudecode",
+      "kind": "cli_agent",
+      "seats": 24,
+      "promptCount": 18400,
+      "status": "enforcing"
+    },
+    {
+      "provider": "cursor",
+      "kind": "ide",
+      "seats": 18,
+      "promptCount": 11200,
+      "status": "enforcing"
+    }
+  ]
+}
+```
+
+- `provider`/`kind` are real-queried from the connected `inventory` harness rows (distinct
+  `attributes.provider` + `attributes.kind`); `promptCount` is a real `audit_events` count
+  (`eventType='prompt'`) grouped by provider within the window.
+- `seats`/`status` are curated (`PROVIDER_SEATS`/`PROVIDER_STATUS`) this milestone — no
+  seats/posture column exists on the harness rows yet.
+- `providerCount`/`seatCount` are computed over **every** connected provider, before ranking +
+  slicing `tools[]` to `limit` — e.g. 5 connected providers with `limit=4` still reports
+  `providerCount: 5`.
 
 ---
 
