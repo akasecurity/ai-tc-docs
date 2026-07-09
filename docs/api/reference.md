@@ -2697,7 +2697,7 @@ an independent query path. The granular endpoints remain the source of truth.
 
 ## Operations API (`/v1/operations`)
 
-> **Status: 6 of 7 endpoints live.**
+> **Status: 7 of 7 endpoints live**, plus an optional `/overview` fan-out.
 
 Tenant-wide read endpoints backing the dashboard **Govern → Operations** overview. Unlike
 Activity/My Health (self-scoped to the caller), every read here reflects the **whole tenant
@@ -2709,13 +2709,14 @@ estate** — no `req.userId` threading, same tenant-wide shape as Inventory/Secu
 
 | #   | Method | Path                             | operationId                 | Status   |
 | --- | ------ | -------------------------------- | --------------------------- | -------- |
-| §1  | `GET`  | `/v1/operations/summary`         | `getOperationsSummary`      | **Live** |
-| §2  | `GET`  | `/v1/operations/kpis`            | `getOperationsKpis`         | **Live** |
-| §3  | `GET`  | `/v1/operations/activity`        | `listOperationsActivity`    | **Live** |
-| §4  | `GET`  | `/v1/operations/connected-tools` | `listConnectedTools`        | **Live** |
-| §5  | `GET`  | `/v1/operations/top-policies`    | `listTopPolicyDetections`   | **Live** |
-| §6  | `GET`  | `/v1/operations/top-security`    | `listTopSecurityDetections` | **Live** |
-| §7  | `GET`  | `/v1/operations/external-shares` | `listExternalShares`        | Planned  |
+| 1   | `GET`  | `/v1/operations/summary`         | `getOperationsSummary`      | **Live** |
+| 2   | `GET`  | `/v1/operations/kpis`            | `getOperationsKpis`         | **Live** |
+| 3   | `GET`  | `/v1/operations/activity`        | `listOperationsActivity`    | **Live** |
+| 4   | `GET`  | `/v1/operations/connected-tools` | `listConnectedTools`        | **Live** |
+| 5   | `GET`  | `/v1/operations/top-policies`    | `listTopPolicyDetections`   | **Live** |
+| 6   | `GET`  | `/v1/operations/top-security`    | `listTopSecurityDetections` | **Live** |
+| 7   | `GET`  | `/v1/operations/external-shares` | `listExternalShares`        | **Live** |
+| —   | `GET`  | `/v1/operations/overview`        | `getOperationsOverview`     | **Live** |
 
 Responses are **semantic, not presentational** — no `color`/`icon`/`label`/`tone` fields and no
 pre-formatted strings (counts are raw integers, timestamps are ISO-8601); the frontend derives
@@ -2728,7 +2729,7 @@ the service layer — the same "curated business fact, not measured" convention 
 
 ---
 
-### §1 — GET /v1/operations/summary
+### GET /v1/operations/summary
 
 Powers the page subtitle (e.g. _"AI traffic across 5 providers · 6 repositories · last sync 2m
 ago"_). **Not range-scoped** — reflects the current connected estate.
@@ -2750,7 +2751,7 @@ table exists yet to derive a real value from).
 
 ---
 
-### §2 — GET /v1/operations/kpis
+### GET /v1/operations/kpis
 
 Powers the four headline stat tiles — a headline value + trend delta, and a sparkline sharing one
 x-axis across all four metrics. Granularity mirrors `GET /v1/security/findings/timeseries`.
@@ -2798,7 +2799,9 @@ every other range-scoped endpoint in this API).
 - `previousValue` is the same metric over the immediately preceding window of equal length.
 - `total_users` counts distinct users active (session-root events) in the window — a user active
   on multiple days counts once toward `value`/`previousValue`, but contributes to every bucket
-  they were active in.
+  they were active in. **This is distinct ACTIVE users within the range window, not total
+  registered/provisioned tenant users** — the FE should label it accordingly (e.g. "active users",
+  not "total users").
 - `tripped_detections` counts `inspection_findings` (the "new" audit-event pipeline) in the
   window — not the legacy `findings`/`events` pair.
 - `tokens_saved` is curated (`0`) this milestone — no tenant-wide token-savings source exists yet
@@ -2806,7 +2809,7 @@ every other range-scoped endpoint in this API).
 
 ---
 
-### §3 — GET /v1/operations/activity
+### GET /v1/operations/activity
 
 Powers the "Recent activity" feed — the newest enforcement/scan/policy events. **Not
 range-scoped** (a recency feed, capped by `limit`).
@@ -2850,8 +2853,9 @@ range-scoped** (a recency feed, capped by `limit`).
   detection-derived rows (`inspection_findings` whose `actionTaken` is an enforcement action —
   `block`/`redact`/`warn` — joined to their parent `audit_events`/`inspection_definitions`) and
   event-derived rows (`audit_events` with `eventType` `config_scan` → `scan` or `share` → `share`).
-- `actor.type` is `user` (with `id` + an email resolved via the catalog, falling back to the raw
-  id) for a detection-derived row — the event that tripped the finding always has a real user —
+- `actor.type` is `user` (with `id` + an email resolved via the catalog, falling back to
+  `'Unknown user'` when no email resolves — the real id is still kept) for a detection-derived
+  row — the event that tripped the finding always has a real user —
   and `system` (no `id`) for an event-derived row (a config scan / egress detection is an
   automated process, never a user click).
 - `kind` values `policy` and `connect` have no queryable source yet (no policy-edit audit trail,
@@ -2859,7 +2863,7 @@ range-scoped** (a recency feed, capped by `limit`).
 
 ---
 
-### §4 — GET /v1/operations/connected-tools
+### GET /v1/operations/connected-tools
 
 Powers the "Connected LLM tools" card — providers with posture, seats, and prompt volume. Header
 counts (`providerCount`/`seatCount`) describe the **full connected estate**, never capped by
@@ -2884,14 +2888,16 @@ counts (`providerCount`/`seatCount`) describe the **full connected estate**, nev
       "kind": "cli_agent",
       "seats": 24,
       "promptCount": 18400,
-      "status": "enforcing"
+      "status": "enforcing",
+      "estimatedFields": ["seats", "status"]
     },
     {
       "provider": "cursor",
       "kind": "ide",
       "seats": 18,
       "promptCount": 11200,
-      "status": "enforcing"
+      "status": "enforcing",
+      "estimatedFields": ["seats", "status"]
     }
   ]
 }
@@ -2902,16 +2908,19 @@ counts (`providerCount`/`seatCount`) describe the **full connected estate**, nev
   (`eventType='prompt'`) grouped by provider within the window.
 - `seats`/`status` are curated (`PROVIDER_SEATS`/`PROVIDER_STATUS`) this milestone — no
   seats/posture column exists on the harness rows yet.
+- `estimatedFields` lists which fields on the item are served from curated placeholder constants
+  this milestone (not measured), so the FE can badge them — today always `["seats", "status"]`;
+  becomes `[]` once a field is backed by a real query.
 - `providerCount`/`seatCount` are computed over **every** connected provider, before ranking +
   slicing `tools[]` to `limit` — e.g. 5 connected providers with `limit=4` still reports
   `providerCount: 5`.
 
 ---
 
-### §5 — GET /v1/operations/top-policies
+### GET /v1/operations/top-policies
 
 Powers the "Top policy detections" list — policies ranked by trip count in the window, each
-with a per-bucket `trend` sharing §2's own bucketed x-axis.
+with a per-bucket `trend` sharing the KPIs endpoint's own bucketed x-axis.
 
 **Query:**
 
@@ -2952,14 +2961,14 @@ with a per-bucket `trend` sharing §2's own bucketed x-axis.
 - `items[]` are built from every category-targeted `policies` row (`target: {"category": ...}`)
   for the tenant — a rule-id-targeted policy has no `category` to report and is excluded.
   `hits`/`trend` come from `inspection_findings` joined to `inspection_definitions.category`,
-  bucketed on the SAME windowStart-anchored axis as §2's `kpis`.
+  bucketed on the SAME windowStart-anchored axis as the KPIs endpoint's `kpis`.
 - **A policy with zero findings in the window is still present** with `hits: 0` and an all-zero
   `trend` — never omitted (e.g. a disabled or rarely-tripped category).
 - `category` maps the DB's `DetectionCategory` onto the contract's `FindingCategory`
   (`code_context` → `source_code`, else 1:1). `code_flaw` and `config`-targeted policies have no
   `FindingCategory` equivalent and are dropped from this list — `code_flaw` findings are
-  surfaced via §6's OWASP taxonomy instead; `config` is observe-only tooling posture, not a data
-  class.
+  surfaced via the top-security endpoint's OWASP taxonomy instead; `config` is observe-only
+  tooling posture, not a data class.
 - `action` maps the DB's `ActionTaken` (`warn`/`redact`/`block`/`allow`/`log`) onto the
   contract's `PolicyAction` (`warn`/`redact`/`block`/`monitor`) — `log` and `allow` both curate
   to `monitor` (the closest observe-only reading; `log` mirrors the built-in "Monitor" archetype's
@@ -2969,7 +2978,7 @@ with a per-bucket `trend` sharing §2's own bucketed x-axis.
 
 ---
 
-### §6 — GET /v1/operations/top-security
+### GET /v1/operations/top-security
 
 Powers the "Top security detections" list — findings bucketed into the OWASP Top 10 (2021),
 ranked by count. Read-only; drill-down deep-links to Security/Findings.
@@ -3012,6 +3021,112 @@ ranked by count. Read-only; drill-down deep-links to Security/Findings.
 - `severity` is the OWASP bucket's own **curated category severity** (a fixed per-bucket value),
   not derived from any individual finding's own severity, which varies per rule.
 - Not a bucketed series — a single window total per bucket, no `trend`.
+
+---
+
+### GET /v1/operations/external-shares
+
+Powers the "External data shares" card — outbound destinations ranked by risk. Header count
+(`destinationCount`) describes the **full inventory**, never capped by `limit`. **Not
+range-scoped.**
+
+**Query:**
+
+| Param   | Type    | Default | Notes                                                  |
+| ------- | ------- | ------- | ------------------------------------------------------ |
+| `limit` | integer | `4`     | `1–20`. Ranked by `risk` (high→low), then volume desc. |
+
+**Response:** `200 ExternalSharesResponse`
+
+```json
+{
+  "destinationCount": 3,
+  "items": [
+    {
+      "id": "sh_44",
+      "destination": "api.openai.com",
+      "kind": "llm_provider",
+      "tokensPerDay": 35000,
+      "risk": "high",
+      "via": "chatgpt",
+      "estimatedFields": ["tokensPerDay", "via"]
+    },
+    {
+      "id": "sh_45",
+      "destination": "45.79.142.6",
+      "kind": "third_party_app",
+      "tokensPerDay": 1500,
+      "risk": "high",
+      "via": "api",
+      "estimatedFields": ["tokensPerDay", "via"]
+    },
+    {
+      "id": "sh_46",
+      "destination": "acme-partner.com",
+      "kind": "third_party_app",
+      "tokensPerDay": 1500,
+      "risk": "medium",
+      "via": "api",
+      "estimatedFields": ["tokensPerDay", "via"]
+    }
+  ]
+}
+```
+
+- `destination`/`kind` are real-queried from the `share_destination` table (the same source the
+  Data Shares dashboard's `/v1/shares/destinations` reads). `kind` maps the Data Shares domain's
+  `DestinationKind` (`provider`/`internal`/`ip`) onto this API's own `shareKind`
+  (`mcp_server`/`llm_provider`/`third_party_app`) — a `provider` destination (a recognized
+  external service) maps to `llm_provider`; `internal`/`ip` (and any unrecognized value) fall
+  back to `third_party_app`. `mcp_server` is never produced by this mapping this milestone —
+  `DestinationKind` has no MCP-server concept yet.
+- `risk` is **derived** (not curated) from the same table's real `trust` column
+  (`ShareTrustLevel`): `recognized`/`internal` → `low`, `unverified` → `medium`, `ip` → `high`
+  (fail-safe default for any unrecognized value).
+- `tokensPerDay`/`via` are curated per resolved `shareKind` (`SHARE_TOKENS_PER_DAY`/`SHARE_VIA`)
+  this milestone — no egress-volume or calling-tool attribution column exists on
+  `share_destination`/`share_endpoint` yet.
+- `estimatedFields` lists which fields on the item are served from curated placeholder constants
+  this milestone (not measured), so the FE can badge them — today always
+  `["tokensPerDay", "via"]`; becomes `[]` once a field is backed by a real query.
+- `shareKind`/`shareRisk` are intentionally kept Operations-local, **not** unified with the Data
+  Shares domain's own `DestinationKind`/`ShareTrustLevel` — the two APIs model related but
+  distinct concepts (this card's egress-risk framing vs. Data Shares' full destination detail).
+- Ranking is **two-key**: `risk` high→low first, then `tokensPerDay` desc as the tie-break —
+  unlike every other ranked list in this API, which sorts on one key alone.
+
+---
+
+### Optional: GET /v1/operations/overview
+
+A thin fan-out for the page's initial paint — one request instead of seven. The granular
+endpoints above remain the source of truth; `overview` composes their exact same service calls,
+never a forked query path.
+
+**Query:** `range` (see [Shared `range` query parameter](#shared-range-query-parameter), default
+`30d` — scopes `kpis`/`connectedTools`/`topPolicies`/`topSecurity`, same as calling each endpoint
+directly).
+
+**Response:** `200 OperationsOverviewResponse`
+
+```json
+{
+  "summary": { "providerCount": 5, "repositoryCount": 6, "lastSyncAt": null },
+  "kpis": { "granularity": "day", "buckets": ["..."], "metrics": ["..."] },
+  "connectedTools": { "providerCount": 5, "seatCount": 90, "tools": ["..."] },
+  "topPolicies": { "granularity": "day", "buckets": ["..."], "items": ["..."] },
+  "topSecurity": { "items": ["..."] },
+  "externalShares": { "destinationCount": 3, "items": ["..."] },
+  "activity": { "items": ["..."] }
+}
+```
+
+- Each section uses **its own endpoint's default `limit`** — `connectedTools` 4, `topPolicies` 5,
+  `topSecurity` 5, `externalShares` 4, `activity` 7 — identical to calling that endpoint
+  standalone with no `limit` query param.
+- `overview`'s response for a given `range` is **byte-for-byte identical** to fetching each
+  endpoint above separately with matching defaults — it calls the same 7 service methods, never a
+  divergent aggregation path.
 
 ---
 
