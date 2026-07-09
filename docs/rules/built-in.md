@@ -55,7 +55,7 @@ Detects credentials and tokens that should never be shared with AI models. 21 ru
 | `aws-access-key`          | critical | regex   | `entropy`       | AWS Access Key IDs (AKIA/ASIA/AROA/etc.)                          |
 | `aws-secret-key`          | critical | regex   | `entropy`       | AWS Secret Access Keys (40-char, requires aws-secret-key context) |
 | `gcp-service-account`     | critical | regex   | —               | GCP service account emails                                        |
-| `azure-connection-string` | critical | regex   | —               | Azure Storage/SQL connection strings                              |
+| `azure-connection-string` | critical | regex   | —               | Azure Storage/Service Bus/Cosmos connection strings (two keys)    |
 | `openai-api-key`          | critical | regex   | `entropy`       | OpenAI API keys (`sk-proj-...`, `sk-...`)                         |
 | `anthropic-api-key`       | critical | regex   | `entropy`       | Anthropic API keys (`sk-ant-...`)                                 |
 | `stripe-live-key`         | critical | regex   | `entropy`       | Stripe live keys (`sk_live_`, `pk_live_`)                         |
