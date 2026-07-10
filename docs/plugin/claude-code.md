@@ -192,7 +192,7 @@ Environment variables are **not** used: hooks are processes spawned by Claude Co
 
 Unconfigured is a valid state: until `/aka:setup` runs, detection still uses the bundled rule packs and default actions (`secret` → block, `pii` → redact where possible), and the first prompt nudges the user to run the wizard.
 
-> **Enterprise (Phase 2).** A backend URL + bearer token live in a separate `~/.aka/settings/config.json` and gate remote sync. The local-first flow above does not ask for either — they are not part of `/aka:setup` today. The `token` carries an `AKA_LOCAL_TOKEN` (sent as `Authorization: Bearer`) in `local`/`test` modes, or a Better Auth API key (sent as `x-api-key`) in `dev`/`hosted`/`self-hosted` modes; see [Minting an API key](../api/reference.md#minting-an-api-key) in the API reference.
+> **Enterprise (Phase 2).** Attaching to an enterprise backend is configured separately and isn't part of `/aka:setup` today. See the enterprise docs for backend URL/token configuration and API key minting.
 
 ## Reading your local data (standalone)
 

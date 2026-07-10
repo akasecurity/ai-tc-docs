@@ -5,9 +5,9 @@
 ```
 ai-control-plane/
 ├── apps/
-│   ├── backend/          Fastify 5 API server (per-customer control plane)
+│   ├── backend/          Fastify 5 API server (enterprise, per-customer control plane)
 │   ├── registry/         Fastify 5 global rule marketplace (cross-tenant, public read)
-│   ├── dashboard/        React 19 + Vite SPA
+│   ├── dashboard/        React 19 + Vite SPA (enterprise)
 │   ├── docs/             This MkDocs site
 │   └── plugin-claude-code/  Claude Code hook scripts
 ├── packages/
@@ -32,14 +32,16 @@ ai-control-plane/
     └── docker-compose.dev.yml    (dev — Postgres + backend + dashboard + docs)
 ```
 
+`apps/backend` and `apps/dashboard` are the enterprise control plane — see the
+enterprise docs for their architecture. Everything below describes the
+open-source surface: the plugin, the CLI, the local SQLite store, and the OSS
+web-ui.
+
 ## Package dependency rules
 
 AKA enforces strict import boundaries via the pnpm workspace graph + `tsc` (a forbidden import does not resolve / fails typecheck) and a dedicated CI gate (`pnpm check:boundaries`), not a lint plugin. Violating them is a CI failure.
 
 ```
-apps/backend/routes       →  @alsoknownassecurity/schema (Zod only), services/
-apps/backend/services     →  repositories/
-apps/backend/repositories →  @alsoknownassecurity/schema/drizzle/*, drizzle-orm
 apps/plugin-*             →  @alsoknownassecurity/plugin-sdk, @alsoknownassecurity/plugin-runtime
 @alsoknownassecurity/plugin-runtime       →  @alsoknownassecurity/plugin-sdk, @alsoknownassecurity/persistence, @alsoknownassecurity/client, @alsoknownassecurity/schema
 @alsoknownassecurity/plugin-sdk           →  @alsoknownassecurity/detections, @alsoknownassecurity/client, @alsoknownassecurity/persistence, @alsoknownassecurity/schema
@@ -53,7 +55,7 @@ Three cross-cutting rules every contributor must remember:
 
 1. **No `process.env` outside `packages/config`** — enforced by `n/no-process-env: 'error'`
 2. **No `fetch()` outside `packages/client`** — by convention + boundary lint
-3. **No Drizzle imports outside `apps/backend/src/repositories/` and `tools/migrator/`**
+3. **No Drizzle imports outside `apps/backend/src/repositories/` and `tools/migrator/`** (the enterprise repository layer — see the enterprise docs)
 
 ## Local-first plugin & optional backend (Phase 1)
 
@@ -63,7 +65,7 @@ depends on a single **`DataGateway`** port (defined in `@alsoknownassecurity/plu
 
 - **standalone** (default) → a SQLite store at `~/.aka/data/aka.db` via
   `@alsoknownassecurity/persistence` — the always-present writer of `events` and `findings`.
-- **attached** → the (local) backend's HTTP API via `@alsoknownassecurity/client`; the plugin
+- **attached** → the enterprise backend's HTTP API via `@alsoknownassecurity/client`; the plugin
   also pulls the org's centrally-managed ruleset into a cache and detects with it.
 
 Detection runs in-process in either mode, and results surface through slash
@@ -90,7 +92,7 @@ file. In Phase 1 nothing leaves the machine.
 
 ## Data flow
 
-### Event ingestion (plugin → local store; → backend is Phase 2)
+### Event ingestion (plugin → local store; enterprise sync is a separate, later hop)
 
 ```
 ┌────────────────────────────────────────────┐
@@ -103,42 +105,45 @@ file. In Phase 1 nothing leaves the machine.
 │        → scan() against loaded rules        │
 │        → resolve policy action              │
 │        → redact if action = redact          │
-│        → queueEvent() to backend            │
+│        → writeEvent() to the local store    │
 │     → writes {action, prompt?} to stdout    │
 │  3. Claude receives (possibly redacted)     │
 │     prompt and responds                     │
 └────────────────────────────────────────────┘
                     │
-                    ▼ HTTP POST /v1/events
-┌────────────────────────────────────────────┐
-│  @alsoknownassecurity/backend                               │
-│                                             │
-│  Route: validate IngestRequest (Zod)        │
-│  Service: ingestEvents()                    │
-│  Repository: insertEvents()                 │
-│    → isoToEpochMillis(ev.occurredAt)        │
-│    → deduplication by event.id              │
-│    → INSERT INTO events                     │
-│  Response: { accepted, duplicates }         │
-└────────────────────────────────────────────┘
+                    ▼
+        ~/.aka/data/aka.db  (@alsoknownassecurity/persistence)
 ```
 
-### Policy bundle (backend → plugin cache)
+In `attached` mode the same event is additionally queued to the enterprise
+backend over HTTP — see the enterprise docs for that request's lifecycle
+(route → service → repository) on the backend side.
 
-The plugin caches a `PolicyBundle` from the backend. On each session start (or after TTL expiry), it refreshes:
+### Policy bundle (attached mode only)
 
-```
-GET /v1/policy-bundle
-→ { policies, customKeywords, bundleVersion }
-```
-
-The plugin stores this in memory and uses it to resolve actions without a round-trip per event.
+In `attached` mode the plugin caches a `PolicyBundle` pulled from the
+enterprise backend and refreshes it on session start (or after TTL expiry),
+so it can resolve actions without a round-trip per event. In `standalone`
+mode there is no bundle to fetch — policy comes from the local store.
 
 ### Dashboard
 
-The dashboard is a React SPA that calls the backend's REST API via TanStack Query. It builds to `apps/backend/public/` so the production container serves both the API and the UI from a single port.
-
-The OSS **web-ui** (`apps/web-ui`, Next.js) mirrors the enterprise dashboard's look and feel but reads the local SQLite store directly through `@alsoknownassecurity/persistence` in Server Components — no `@alsoknownassecurity/client`, no HTTP, no rule registry. Both apps render the same presentational `*View` components from `@alsoknownassecurity/dashboard-ui`; enterprise-only affordances are injected as optional props (e.g. `FindingDetailView`'s `footer`, `DetectionDetailView`'s action callbacks). The **Detections** page adds a matching OSS read path (`db().detections` — list/detail/stats over `installed_packs`, reusing the pure `buildDetectionsList` / `rowToDetectionDetail` builders from `@alsoknownassecurity/schema` so shapes never drift from the hosted contract) plus the web-ui's **first local write path**: changing a detection's enforcement policy (or toggling it) is a Next.js Server Action that calls the persistence write facade and `revalidatePath`s the page. Import-from-library and pulling upstream updates remain enterprise-only (they require the registry).
+The OSS **web-ui** (`apps/web-ui`, Next.js) reads the local SQLite store
+directly through `@alsoknownassecurity/persistence` in Server Components — no
+`@alsoknownassecurity/client`, no HTTP, no rule registry. It renders the same
+presentational `*View` components from `@alsoknownassecurity/dashboard-ui`
+that the enterprise dashboard does; enterprise-only affordances are injected
+as optional props (e.g. `FindingDetailView`'s `footer`,
+`DetectionDetailView`'s action callbacks) rather than forking the view. The
+**Detections** page adds a matching OSS read path (`db().detections` —
+list/detail/stats over `installed_packs`, reusing the pure
+`buildDetectionsList` / `rowToDetectionDetail` builders from
+`@alsoknownassecurity/schema` so shapes never drift from the hosted contract)
+plus the web-ui's **first local write path**: changing a detection's
+enforcement policy (or toggling it) is a Next.js Server Action that calls the
+persistence write facade and `revalidatePath`s the page. Import-from-library
+and pulling upstream updates remain enterprise-only (they require the
+registry).
 
 The **Policies** page renders the shared built-in policy catalog (`db().policyCatalog` — monitor/warn/redact/block with live "used by N detections" counts joined from `installed_packs`, NULL policy attributed to Monitor to match the Detections views) and, below it, the read-only local enforcement config (`db().policies.readPolicies()`) so a disabled per-detection-type policy — which the plugin still resolves against — is never invisible. The **Data Shares** page reads the local egress register through `db().shares` (grouped destinations, the needs-review strip, and the selected destination detail), with the egress Block/Allow decision persisted via a Server Action (`setEgressDecision`, which returns whether the row still existed so the client can surface a failed write). The **Inventory** page reads the asset model through `db().inventoryAssets` (harnesses / assets / projects / stats + the selected node's project file tree / harness overview / asset detail / file drawer), resolving the active selection with the shared `resolveInventorySelection` so it can't fork from enterprise; the per-file LLM-access and MCP-trust edits are Server Actions (`setFileAccess` / `setMcpTrust`) that likewise return success so the client surfaces failures. Both Data Shares and Inventory have no scanner yet, so they ship a **removable sample dataset**: `db().seedSampleData()` runs once per process (guarded by a persistent `app_meta` marker + domain-emptiness, so it never seeds over real data), and a `hasSampleData()`-gated **Clear sample data** action calls `clearSampleData()` (deletes every `provenance='sample'` row, children first) and `revalidatePath('/', 'layout')` since the clear crosses domains.
 
@@ -167,130 +172,11 @@ regenerates and fails on drift (run in CI). Generated files are `@ts-nocheck`,
 ESLint-ignored, and Prettier-ignored — type-safety is enforced at the wrapper
 boundary and each call site.
 
-## Request lifecycle (backend)
+## Enterprise backend internals
 
-Every API request passes through:
-
-```
-Fastify onRequest hook
-  → Auth stub: validates Bearer token against AKA_LOCAL_TOKEN
-  → (future: Better Auth middleware with JWT + tenant resolution)
-      ↓
-Route handler
-  → Zod validation (safeParse on body / query)
-  → calls Service function
-      ↓
-Service
-  → orchestrates one or more Repository calls
-  → contains business logic
-      ↓
-Repository
-  → Drizzle query builder (select / insert / update)
-  → no business logic
-      ↓
-Response
-  → plain object → JSON serialization by Fastify
-```
-
-## Database schema
-
-### Catalog / Tenant split
-
-The Drizzle schema lives in `packages/schema/src/drizzle/` and is split into two logical groups:
-
-| Group       | Tables                                                                                                                                              | File                  |
-| ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| **Catalog** | `tenants`, `users`                                                                                                                                  | `catalog/postgres.ts` |
-| **Tenant**  | `events`, `findings`, `policies`, `inventory`, `source_project`, `audit_events`, `classified_data`, `inspection_definitions`, `inspection_findings` | `tenant/postgres.ts`  |
-
-The catalog tables are cross-tenant metadata (no row-level security). The tenant tables hold per-tenant operational data and are protected by FORCE RLS. The enterprise schema is Postgres-only (ADR: Postgres-only enterprise); the tenant-free OSS local store (SQLite) lives separately in `@alsoknownassecurity/schema` (`drizzle/local/sqlite.ts`).
-
-The combined runtime object `pgSchema` (exported from `@alsoknownassecurity/schema-enterprise/drizzle`) spreads both groups together and is used as the drizzle client's `{ schema }` argument. A base→extended row contract (`Base*Row` in `@alsoknownassecurity/schema` → `Tenant*Row` in `@alsoknownassecurity/schema-enterprise`) plus invariant `.test.ts` guards keep the OSS SQLite tables and the enterprise Postgres tables from diverging.
-
-| Table      | Purpose                                                     |
-| ---------- | ----------------------------------------------------------- |
-| `tenants`  | Top-level billing/auth boundary                             |
-| `users`    | Member of a tenant, with a role                             |
-| `events`   | Each captured prompt / response / code_change               |
-| `findings` | Each rule match on an event                                 |
-| `policies` | Per-tenant action overrides (allow / warn / redact / block) |
-
-#### Generalized data model (additive)
-
-A second set of tenant tables generalizes `events`/`findings`/rules into a
-star-shaped data model. They are **additive**: provisioned by the same
-migrations and populated by dedicated repositories in `@alsoknownassecurity/persistence` (and the
-facade's `ensureInventory`), but the live capture path still writes
-`events`/`findings` — the writer cutover happens in a later phase.
-
-| Table                    | Role                                                                                 |
-| ------------------------ | ------------------------------------------------------------------------------------ |
-| `inventory`              | Existence/dimension rows (`host`, `harness`, `user`), content-addressed and deduped  |
-| `source_project`         | The repository/project a session ran against, content-addressed by remote url        |
-| `audit_events`           | Timeline/fact rows forming a self-referential tree (`session → run → tool_call → …`) |
-| `classified_data`        | Small class dimension of recognized sensitive-data kinds (`aws_key`, `email_pii`, …) |
-| `inspection_definitions` | A detection rule version (id encodes the version, so a finding cites the exact rule) |
-| `inspection_findings`    | A hit of a definition against an audit event                                         |
-
-Inventory/source rows carry content-addressed, tenant-scoped ids
-(`sha256(tenant_id + …)`, computed in `@alsoknownassecurity/persistence`) so repeat sessions
-upsert idempotently. Hot filter keys (`os_version`, `harness_version`) are SQLite
-generated columns over the JSON `attributes` bag, indexed for facets.
-
-### Timestamp representation and the `time.ts` boundary
-
-SQLite cannot store `TIMESTAMP WITH TIME ZONE` natively. The storage strategy is:
-
-| Dialect            | Column type                | Wire format     |
-| ------------------ | -------------------------- | --------------- |
-| SQLite             | `integer` (epoch-millis)   | —               |
-| Postgres           | `timestamp with time zone` | —               |
-| Zod (API boundary) | `z.string().datetime()`    | ISO-8601 string |
-
-**Who converts and where:** `packages/schema/src/time.ts` exports two pure helpers with no Drizzle import:
-
-- `isoToEpochMillis(iso: string): number` — used by the repository WRITE path before inserting `occurred_at` into SQLite
-- `epochMillisToIso(ms: number): string` — used by the repository READ path when mapping rows back to the Zod `Event` type
-
-The boundary is strictly at the repository layer (`apps/backend/src/repositories/events.ts`). All routes and services above the repository see ISO-8601 strings. The raw integer never escapes past `listEvents`.
-
-```
-Zod(ISO) → repo.isoToEpochMillis → sqlite INTEGER
-           repo.epochMillisToIso ← sqlite INTEGER
-Zod(ISO) ← repo
-```
-
-### Row-level security (Postgres only)
-
-Every tenant table (`events`, `findings`, `policies`, and the generalized data-model tables `inventory`, `source_project`, `audit_events`, `classified_data`, `inspection_definitions`, `inspection_findings`) declares `ENABLE ROW LEVEL SECURITY` and a single permissive policy keyed on `current_setting('app.tenant_id', true)` — the enterprise schema is Postgres-only, and FORCE RLS is applied via companion migrations. (The OSS local store in `@alsoknownassecurity/schema` is single-tenant SQLite with no RLS.)
-
-The generated migration (`drizzle/postgres/0000_*.sql`) contains:
-
-- `ALTER TABLE "events" ENABLE ROW LEVEL SECURITY;`
-- `CREATE POLICY "events_tenant_isolation" ... USING ("tenant_id" = current_setting('app.tenant_id', true))`
-- (same for `findings` and `policies`)
-
-**FORCE ROW LEVEL SECURITY companion:** drizzle-kit 0.31 emits `ENABLE ROW LEVEL SECURITY` and `CREATE POLICY` but NOT `FORCE ROW LEVEL SECURITY`. Without FORCE, the table owner role bypasses RLS entirely. FORCE is added by **journaled custom migrations** (e.g. `drizzle/postgres/0001_force_rls.sql`, and `0010_force_rls_meta_data_model.sql` for the generalized data-model tables), recorded in `meta/_journal.json` and applied by the standard drizzle-orm migrator after the table-creating migration they accompany. These are the only hand-written SQL files in the project. (Note: a plain file sorted by name — e.g. a `9999_*.sql` — would NOT be applied, because the migrator reads the journal, not the directory listing.) When drizzle-kit gains native FORCE RLS support, this migration should be removed and `0000_initial` regenerated.
-
-**Per-request tenant context.** `withTenantContext` opens a transaction and issues `set_config('app.tenant_id', $1, true)` (tenantId bound, never interpolated) so Postgres FORCE RLS resolves the active tenant. Routes never call it directly. A **tenant-scope plugin** (`apps/backend/src/plugins/tenant-scope.ts`) decorates each request with `req.tenantScope` — an `open` `TenantScope` bound to that request's tenant — and repositories open their own context from it via `runInScope`. Isolation therefore lives in the data layer: a route cannot reach the database without RLS in force, because the only db-bearing value it can touch is the scope (typed `TenantScope | null`, narrowed by `requireTenantScope` which throws loudly rather than allow an un-scoped query). For work that must be atomic across several repository calls, `withTenantTransaction` opens one transaction and yields a `joined` scope shared by every call, so they commit or roll back together.
-
-## Multi-tenancy (stub)
-
-The current auth hook is a single-user bearer token stub. Real multi-tenancy (Better Auth + row-level tenantId filtering via `SET LOCAL app.tenant_id`) is planned for Week 3. The schema and repository layer are already tenancy-aware — every row carries a `tenant_id`, RLS policies are declared in the Postgres dialect, and the FORCE companion migration is in place.
-
-## Observability (OpenTelemetry)
-
-The system is instrumented with OpenTelemetry for distributed tracing, metrics, and trace-correlated logs, following CNCF conventions. It is **off by default and zero-cost when disabled** (`OTEL_ENABLED=false`): the SDK is loaded via a `node --import` preload that returns before importing any `@opentelemetry/*` code unless enabled, and hot-path code (the DB span wrapper, outgoing header injection) short-circuits on a boolean.
-
-- **Collector-centric.** Apps only ever emit OTLP to an OpenTelemetry Collector, which fans out to Jaeger (traces) + Prometheus (metrics) by default, or to AWS CloudWatch/X-Ray or Azure Monitor by collector config alone — vendor choice never touches app code.
-- **Coverage.** HTTP/Fastify/Postgres via auto-instrumentation; an explicit `db.query` span + metric at the `runInScope` chokepoint covers every Postgres query; auth lookups get spans. `@alsoknownassecurity/client` injects W3C `traceparent` + a correlation id on every outgoing call, so plugin→backend→DB→registry is one trace.
-- **Correlation.** Every request reuses/echoes `x-request-id` (the trace id when present) and every log line carries `trace_id`/`span_id`.
-- **Probes.** `/healthz/live` is a dependency-free liveness check; `/healthz/ready` is dependency-aware readiness (`503` when the DB ping fails). Both are always available regardless of `OTEL_ENABLED`.
-
-Implementation lives in `@alsoknownassecurity/telemetry` (shared SDK bootstrap) with per-service `--import` preloads; the runtime keeps `@opentelemetry/*` external because its instrumentation uses dynamic `require()`s a bundle cannot express. See [Observability](../operations/observability.md).
-
-## Follow-ups (known gaps)
-
-**Schema type aliases:** the enterprise schema (`@alsoknownassecurity/schema-enterprise/drizzle`) exports `PgSchema` (the full combined handle) and the logical seams `PgCatalogSchema` / `PgTenantSchema`, each derived with `Pick<...>` over the runtime `pgSchema` object, so the types cannot drift from what `drizzle()` receives — a misspelled or removed table is a compile error. Cross-dialect divergence between the OSS SQLite store and the enterprise Postgres tables is caught by the base→extended row-contract guards (`packages/schema-enterprise/src/drizzle/adherence.test.ts` and its OSS counterpart), enforced by `tsc --noEmit` + `vitest`.
-
-**Server-derived `findings.tenantId`:** `tenantId` is **server-derived** — injected from the authenticated context, never accepted from a request body. `packages/schema/src/zod/finding.ts` now mirrors the events pattern: the full `Finding` row schema carries `tenantId` (restoring Zod↔Drizzle parity with `findings.tenant_id`), and `DetectedFinding = Finding.omit({ tenantId: true })` is the producer-side shape. The future findings repository injects `tenantId` from the tenant scope on write — exactly as `insertEvents(scope, batch, userId)` reads `scope.tenantId` for `IngestEvent` — giving a single source of truth that lines up with the Postgres RLS `WITH CHECK (tenant_id = current_setting('app.tenant_id'))`. Decision locked by `packages/schema/src/zod/finding.test.ts`.
+The enterprise backend's request lifecycle (Fastify route → service →
+Drizzle repository), its Postgres schema (catalog/tenant table split, the
+generalized inventory/audit data model), the `time.ts` SQLite↔Postgres
+timestamp boundary, Row-Level Security enforcement, multi-tenancy, and
+OpenTelemetry instrumentation are covered in the enterprise docs — none of it
+applies to the OSS local-first path described above.

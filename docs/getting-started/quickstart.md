@@ -1,12 +1,11 @@
 # Quickstart
 
-This guide takes you from zero to a working AKA installation with the Claude Code plugin active, events being captured, and findings appearing in the dashboard.
+This guide takes you from zero to a working AKA installation with the Claude Code plugin active, events being captured, and findings appearing in the local dashboard — no backend, no Docker, no Postgres.
 
 ## Prerequisites
 
 - **Node.js 26+** and **pnpm 10+**
 - **Claude Code** installed and signed in
-- **Docker** (optional — needed for the Postgres dev stack)
 
 ## 1. Clone and install
 
@@ -14,103 +13,56 @@ This guide takes you from zero to a working AKA installation with the Claude Cod
 git clone https://github.com/your-org/ai-control-plane
 cd ai-control-plane
 pnpm setup   # pnpm install + lefthook hooks
+pnpm --filter @alsoknownassecurity/cli build
 ```
 
-## 2. Start the backend
-
-The enterprise backend is **Postgres-only**. Bring up the full dev stack (Postgres
-is provided as a service):
+## 2. Set up your local AKA home
 
 ```bash
-docker compose -f docker/docker-compose.dev.yml up
+pnpm --filter @alsoknownassecurity/cli exec aka init
 ```
 
-Services:
+This creates `~/.aka/settings/settings.json` (your preferences) and
+`~/.aka/data/aka.db` (the local SQLite store), seeded with default detection
+policies.
 
-| URL                     | Service                 |
-| ----------------------- | ----------------------- |
-| `http://localhost:4000` | Backend (Postgres)      |
-| `http://localhost:5173` | Dashboard               |
-| `http://localhost:8000` | Docs                    |
-| `http://localhost:8025` | Mailpit (email preview) |
+## 3. Install the Claude Code plugin
 
-> For a single-user, no-server experience, use the OSS stack instead — the `aka`
-> CLI + web-ui read the local SQLite store directly. See
-> [Local / Single-Node](../deployment/local.md).
-
-## 3. Verify the backend is running
+From the repo root, load the plugin for a session:
 
 ```bash
-curl http://localhost:4000/healthz
-# → {"status":"ok","mode":"dev","storageDriver":"postgres","version":"0.0.1"}
+pnpm turbo run build --filter=@alsoknownassecurity/plugin-claude-code
+claude --plugin-dir ./apps/plugin-claude-code
 ```
 
-## 4. Send a test event
+See the [Claude Code plugin guide](../plugin/claude-code.md) for marketplace
+distribution and other install paths.
+
+## 4. Test the plugin hook
+
+Run the hook script directly with a sample payload — a fake credential in the
+same shape a real secrets rule would match — to verify it works:
 
 ```bash
-curl -X POST http://localhost:4000/v1/events \
-  -H "Authorization: Bearer mytoken1234567890" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "events": [{
-      "id": "aaaaaaaa-0000-0000-0000-000000000001",
-      "sourceTool": "claude-code",
-      "kind": "prompt",
-      "occurredAt": "'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'",
-      "contentHash": "abc123",
-      "content": "My AWS key is AKIAIOSFODNN7EXAMPLE, can you check this config?"
-    }]
-  }'
-# → {"accepted":1,"duplicates":0}
+echo '{"prompt":"here is a test credential: see rules/secrets fixtures for the exact shape"}' \
+  | node apps/plugin-claude-code/scripts/user-prompt-submit.js
+# → {"decision":"block","reason":"AKA blocked this prompt — flagged secrets/aws-access-key ..."}
 ```
 
-List it back:
+For a concrete example payload, see the fixtures in `rules/secrets/`.
+
+## 5. Open the dashboard
 
 ```bash
-curl http://localhost:4000/v1/events \
-  -H "Authorization: Bearer mytoken1234567890"
-# → {"items":[{...}],"nextCursor":null}
+pnpm --filter @alsoknownassecurity/cli exec aka dashboard
 ```
 
-## 5. Install the Claude Code plugin
-
-From the repo root, register the plugin with Claude Code:
-
-```bash
-claude mcp add aka-control-plane
-# or point Claude Code to the plugin directory:
-# Settings → Plugins → Add local plugin → apps/plugin-claude-code
-```
-
-The plugin reads two environment variables:
-
-```bash
-export AKA_BACKEND_URL=http://localhost:4000
-export AKA_LOCAL_TOKEN=mytoken1234567890
-```
-
-Add these to your shell profile so they're available in every Claude session.
-
-## 6. Test the plugin hook
-
-Run the hook script directly with a sample payload to verify it works:
-
-```bash
-echo '{"prompt":"My SSN is 123-45-6789 and AWS key AKIAIOSFODNN7EXAMPLE"}' \
-  | AKA_BACKEND_URL=http://localhost:4000 \
-    AKA_LOCAL_TOKEN=mytoken1234567890 \
-    node apps/plugin-claude-code/scripts/user-prompt-submit.js
-# → {"action":"allow","prompt":"My SSN is 123-45-6789 and AWS key AKIAIOSFODNN7EXAMPLE"}
-```
-
-The plugin currently allows all events (warn-only mode). Redaction and blocking are configured via Policy once the full policy editor is implemented.
-
-## 7. Open the dashboard
-
-Navigate to `http://localhost:5173` to see the Events page. The event you sent in step 4 should appear in the table.
+Navigate to `http://localhost:4319/security` to see the Events page. The
+finding from step 4 should appear once you've triggered it from inside a real
+Claude Code session (the direct hook invocation above only tests the script).
 
 ## What's next
 
-- [Configure the backend](configuration.md) for your environment
 - [Write your first detection rule](../rules/writing-rules.md)
 - [Install the plugin for your team](../plugin/claude-code.md)
+- [The `aka` CLI](cli.md) for scanning, stats, and managing detection packs

@@ -74,10 +74,14 @@ nav:
       - Writing Rules: rules/writing-rules.md
       - Built-in Rules: rules/built-in.md
       - Publishing: rules/publishing.md
-  - API Reference: api/reference.md
   - Deployment:
       - Local Mode: deployment/local.md
-      - Dev Mode: deployment/dev.md
-      - Docker: deployment/docker.md
-  - Operations:
-      - Observability: operations/observability.md
+  - Enterprise:
+      - Overview: enterprise/index.md
+      - Architecture: enterprise/architecture.md
+      - Configuration: enterprise/configuration.md
+      - Dev Mode: enterprise/dev-mode.md
+      - Docker: enterprise/docker.md
+      - Local Backend: enterprise/local-backend.md
+      - Observability: enterprise/observability.md
+      - API Reference: enterprise/api-reference.md

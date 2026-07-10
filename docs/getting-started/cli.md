@@ -262,14 +262,9 @@ aka update claude-code   # update just one plugin
 
 ## Attach to an enterprise platform (preview)
 
-```bash
-aka attach https://your-org.aka.example --org your-org-id
-```
-
-`aka attach` is currently a **scaffold**: it flips your local config to attached mode
-and records the binding. Your local store stays **tenant-free** — tenant identity is
-assigned server-side at ingest, never written locally. The full auth handshake + data
-sync land in a later release.
+`aka attach` is currently a **scaffold** for pointing a standalone setup at an
+enterprise platform. See the enterprise docs for the full auth handshake and
+data-sync model once it lands.
 
 ---
 

@@ -19,6 +19,18 @@ Developer ──► Claude Code Plugin ──► AKA Control Plane ──► AI 
 
 Every prompt, tool call, and response that flows through a Claude session is captured by the plugin, scanned against your rule packs, and logged — before the AI sees it or after it responds.
 
+## OSS vs. enterprise
+
+This site documents the **open-source surface**: the Claude Code plugin, the
+`aka` CLI, the local SQLite store, the OSS web dashboard, and the detection
+rule format. It runs entirely on your machine with no backend, no Postgres,
+and no account.
+
+AKA also has an **enterprise control plane** (`apps/backend` + `apps/dashboard`)
+for teams — hosted or self-hosted, Postgres-backed, with multi-tenant policy
+management and a REST API. That surface is documented separately in the
+enterprise docs, not here.
+
 ## Key concepts
 
 | Term          | Description                                                                      |
@@ -48,36 +60,18 @@ The stack is a TypeScript-strict pnpm monorepo:
 
 ## Quick start
 
-=== "OSS single-node (no server)"
+The plugin + `aka` CLI write a local SQLite store (`~/.aka/data/aka.db`) and
+the OSS web-ui reads it directly — no backend, no Postgres, no account.
 
-    The plugin + `aka` CLI write a local SQLite store (`~/.aka/data/aka.db`) and
-    the OSS web-ui reads it directly — no backend, no Postgres, no account.
+```bash
+git clone https://github.com/your-org/ai-control-plane
+cd ai-control-plane
+pnpm setup
+pnpm --filter @alsoknownassecurity/cli build
 
-    ```bash
-    git clone https://github.com/your-org/ai-control-plane
-    cd ai-control-plane
-    pnpm setup
-    pnpm --filter @alsoknownassecurity/cli build
-
-    # `aka` ships as a published package; from a source checkout, run the built bin:
-    pnpm --filter @alsoknownassecurity/cli exec aka dashboard   # OSS web-ui over ~/.aka/data
-    ```
-
-=== "Docker"
-
-    ```bash
-    git clone https://github.com/your-org/ai-control-plane
-    cd ai-control-plane
-    pnpm setup
-
-    docker compose -f docker/docker-compose.dev.yml up
-    ```
-
-Then visit:
-
-- **Backend healthcheck:** `http://localhost:4000/healthz`
-- **Dashboard:** `http://localhost:5173`
-- **Docs (this site):** `http://localhost:8000`
+# `aka` ships as a published package; from a source checkout, run the built bin:
+pnpm --filter @alsoknownassecurity/cli exec aka dashboard   # OSS web-ui over ~/.aka/data
+```
 
 See the [Quickstart](getting-started/quickstart.md) for a complete walkthrough.
 
