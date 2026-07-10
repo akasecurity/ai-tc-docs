@@ -1,7 +1,8 @@
 site_name: AKA AI Control Plane
 site_description: Intercept, inspect, and govern AI prompts and responses across your engineering org
-site_url: !ENV [DOCS_SITE_URL, 'http://localhost:8000']
-repo_name: ai-control-plane
+site_url: !ENV [DOCS_SITE_URL, 'https://alsoknownassecurity.github.io/docs/']
+repo_name: alsoknownassecurity/docs
+repo_url: https://github.com/alsoknownassecurity/docs
 docs_dir: docs
 site_dir: site
 
@@ -76,12 +77,3 @@ nav:
       - Publishing: rules/publishing.md
   - Deployment:
       - Local Mode: deployment/local.md
-  - Enterprise:
-      - Overview: enterprise/index.md
-      - Architecture: enterprise/architecture.md
-      - Configuration: enterprise/configuration.md
-      - Dev Mode: enterprise/dev-mode.md
-      - Docker: enterprise/docker.md
-      - Local Backend: enterprise/local-backend.md
-      - Observability: enterprise/observability.md
-      - API Reference: enterprise/api-reference.md
