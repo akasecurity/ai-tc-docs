@@ -1,0 +1,59 @@
+name: Deploy
+
+# Builds the MkDocs site in --strict mode (warnings fail the build) and
+# publishes it to GitHub Pages on every push to main. PRs only build/validate
+# — they don't deploy.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build docs (strict)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install docs dependencies (mkdocs)
+        run: python -m pip install -r requirements.txt
+
+      - name: Build docs (strict)
+        run: python -m mkdocs build --strict
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'push'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name == 'push'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
