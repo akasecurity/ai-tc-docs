@@ -1,9 +1,9 @@
 # OSS vs. Enterprise
 
-This site documents the **open-source surface**: the Claude Code plugin, the
-`aka` CLI, the local SQLite store, the OSS web dashboard, and the detection
-rule format. It runs entirely on your machine with no backend, no Postgres,
-and no account.
+This site documents the **open-source surface**: the Claude Code / Claude
+Desktop plugin, the `aka` CLI, the local SQLite store, the OSS web dashboard,
+and the detection rule format. It runs entirely on your machine with no
+backend, no Postgres, and no account.
 
 AKA also has an **enterprise control plane** for teams — hosted or
 self-hosted, Postgres-backed, with multi-tenant policy management and a REST
@@ -28,5 +28,6 @@ runs identically in the plugin, the OSS CLI, and the enterprise backend.
 A standalone plugin install can be pointed at the enterprise backend
 (`runMode: attached` / `aka attach`) instead of the local store, for when the
 hosted control plane — not the local file — should be the source of truth.
-See the [Claude Code plugin guide](plugin/claude-code.md) and the enterprise
-docs for the full auth handshake and data-sync model.
+See the [Claude Code](plugin/claude-code.md) or [Claude Desktop](plugin/claude-desktop.md)
+plugin guide and the enterprise docs for the full auth handshake and
+data-sync model.
