@@ -55,14 +55,14 @@ installer writes it to `~/.npmrc` with mode `0600`):
 
     ```bash
     export GITHUB_TOKEN=ghp_your_read_packages_token
-    curl -fsSL https://raw.githubusercontent.com/alsoknownassecurity/ai-control-plane/cli-v0.0.1/tools/installer/install.sh | sh
+    curl -fsSL https://raw.githubusercontent.com/akasecurity/ai-tc/cli-v0.0.1/tools/installer/install.sh | sh
     ```
 
 === "Windows (PowerShell)"
 
     ```powershell
     $env:GITHUB_TOKEN = "ghp_your_read_packages_token"
-    irm https://raw.githubusercontent.com/alsoknownassecurity/ai-control-plane/cli-v0.0.1/tools/installer/install.ps1 | iex
+    irm https://raw.githubusercontent.com/akasecurity/ai-tc/cli-v0.0.1/tools/installer/install.ps1 | iex
     ```
 
 > **Note — why the URL is pinned to `cli-v0.0.1`:** the one-liner fetches the
@@ -83,7 +83,7 @@ aka --help
 2. Install the global package:
 
    ```bash
-   npm install -g @alsoknownassecurity/cli
+   npm install -g @akasecurity/cli
    ```
 
 ---
@@ -91,12 +91,12 @@ aka --help
 ## Authenticating to GitHub Packages (pre-release)
 
 While the packages are private, `npm`/`aka` need to know (a) that the
-`@alsoknownassecurity` scope lives on GitHub Packages and (b) a token to read it. The
+`@akasecurity` scope lives on GitHub Packages and (b) a token to read it. The
 bootstrap installer does this for you; to set it up by hand, add these two lines to
 your **`~/.npmrc`**:
 
 ```ini
-@alsoknownassecurity:registry=https://npm.pkg.github.com
+@akasecurity:registry=https://npm.pkg.github.com
 //npm.pkg.github.com/:_authToken=ghp_your_read_packages_token
 ```
 
@@ -250,7 +250,7 @@ aka update claude-code   # update just one plugin
 - `aka update` shows what would change and **prompts for confirmation** before
   applying. Pass `--yes` (or `-y`) to skip the prompt (required when there's no
   interactive terminal, e.g. in a script). The CLI updates itself with
-  `npm install -g @alsoknownassecurity/cli@latest`; plugins update through the `claude` plugin
+  `npm install -g @akasecurity/cli@latest`; plugins update through the `claude` plugin
   manager (**restart Claude Code afterwards** to load the new version).
 - After other commands, the CLI prints a one-line **notice** when an update — or a
   newly available plugin — is waiting, with the exact command to run. It's computed

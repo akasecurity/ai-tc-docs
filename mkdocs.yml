@@ -1,25 +1,28 @@
-site_name: AKA AI Control Plane
+site_name: aka AI-TC
 site_description: Intercept, inspect, and govern AI prompts and responses across your engineering org
-site_url: !ENV [DOCS_SITE_URL, 'https://alsoknownassecurity.github.io/docs/']
-repo_name: alsoknownassecurity/docs
-repo_url: https://github.com/alsoknownassecurity/docs
+site_url: !ENV [DOCS_SITE_URL, 'https://akasecurity.github.io/docs/']
+repo_name: akasecurity/ai-tc
+repo_url: https://github.com/akasecurity/ai-tc
 docs_dir: docs
 site_dir: site
 
 theme:
   name: material
+  custom_dir: overrides
+  logo: assets/icon.svg
+  favicon: assets/logomark.svg
   palette:
     - media: '(prefers-color-scheme: light)'
       scheme: default
-      primary: indigo
-      accent: blue
+      primary: black
+      accent: teal
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - media: '(prefers-color-scheme: dark)'
       scheme: slate
-      primary: indigo
-      accent: blue
+      primary: black
+      accent: teal
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
@@ -59,21 +62,37 @@ markdown_extensions:
 plugins:
   - search
 
+extra:
+  social:
+    - icon: material/web
+      link: https://akasecurity.io
+      name: akasecurity.io
+    - icon: fontawesome/brands/github
+      link: https://github.com/akasecurity
+      name: GitHub
+    - icon: fontawesome/brands/npm
+      link: https://www.npmjs.com/org/akasecurity
+      name: npm
+
+extra_css:
+  - https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700&family=Public+Sans:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap
+  - stylesheets/extra.css
+  - stylesheets/home.css
+
 nav:
   - Home: index.md
   - Getting Started:
       - Quickstart: getting-started/quickstart.md
-      - CLI (aka): getting-started/cli.md
-      - Detection Exceptions: cli/exceptions.md
+      - Usage: getting-started/usage.md
+      - Adding Exceptions: cli/exceptions.md
       - Configuration: getting-started/configuration.md
-  - Architecture:
-      - System Overview: architecture/overview.md
-      - Detection Engine: architecture/detection-engine.md
   - Plugin Guide:
       - Claude Code: plugin/claude-code.md
-  - Detection Rules:
+      - Claude Desktop: plugin/claude-code.md
+  - Detections:
+      - Built-in Detections: rules/built-in.md
       - Writing Rules: rules/writing-rules.md
-      - Built-in Rules: rules/built-in.md
       - Publishing: rules/publishing.md
-  - Deployment:
-      - Local Mode: deployment/local.md
+  - Architecture Reference:
+      - System Overview: architecture/overview.md
+      - Detection Engine: architecture/detection-engine.md

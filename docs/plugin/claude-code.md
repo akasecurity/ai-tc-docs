@@ -33,7 +33,7 @@ The manifest is intentionally minimal. `name` becomes the command namespace, so 
 {
   "name": "aka",
   "version": "0.0.1",
-  "description": "AKA AI Control Plane — inspect and govern AI prompts in Claude Code",
+  "description": "AKA AI-TC — inspect and govern AI prompts in Claude Code",
   "author": { "name": "AKA" }
 }
 ```
@@ -42,7 +42,7 @@ The manifest is intentionally minimal. `name` becomes the command namespace, so 
 
 ## Architecture in one paragraph
 
-Every hook invocation is a **fresh, short-lived process**: Claude Code pipes a JSON event to the script's stdin and reads a JSON decision from stdout. The hook path is fully local — policy comes from a disk cache (`~/.aka/policy-cache.json`), detection runs in-process via `@alsoknownassecurity/detections` (rule packs are bundled into the scripts at build time), and events are appended to a disk queue (`~/.aka/event-queue.jsonl`). The only network I/O lives in `scripts/sync.js`, which hooks spawn **detached** when the policy cache is stale: it refreshes the bundle and flushes the queue. A dead backend therefore costs nothing on the hook path.
+Every hook invocation is a **fresh, short-lived process**: Claude Code pipes a JSON event to the script's stdin and reads a JSON decision from stdout. The hook path is fully local — policy comes from a disk cache (`~/.aka/policy-cache.json`), detection runs in-process via `@akasecurity/detections` (rule packs are bundled into the scripts at build time), and events are appended to a disk queue (`~/.aka/event-queue.jsonl`). The only network I/O lives in `scripts/sync.js`, which hooks spawn **detached** when the policy cache is stale: it refreshes the bundle and flushes the queue. A dead backend therefore costs nothing on the hook path.
 
 ## Hooks
 
@@ -135,7 +135,7 @@ If this is intentional and you accept the risk, grant an exception:
 More: aka exception --help
 ```
 
-The masked preview reveals only the first and last character of the detected value (`A******E`), and the reference (`3f2a91`) points at a short-lived, fingerprint-only record of what was blocked, so `aka exception approve` can create the grant without the user ever retyping the secret. The approved value itself is never stored — only a keyed fingerprint and a masked preview. See [Detection exceptions](../cli/exceptions.md) for the full walkthrough.
+The masked preview reveals only the first and last character of the detected value (`A******E`), and the reference (`3f2a91`) points at a short-lived, fingerprint-only record of what was blocked, so `aka exception approve` can create the grant without the user ever retyping the secret. The approved value itself is never stored — only a keyed fingerprint and a masked preview. See [Adding exceptions](../cli/exceptions.md) for the full walkthrough.
 
 The raw matched secret is **never** stored or shown — only a masked form. All are read-only; they never mutate the database. They also work directly:
 
@@ -153,7 +153,7 @@ To exclude paths from scanning **entirely**, add a `.akaignore` file (gitignore 
 
 ### `/aka:dashboard` — the web dashboard
 
-For the full graphical view, `/aka:dashboard` launches the OSS web-ui (the same one `aka dashboard` opens) against your local store and points the browser at `http://localhost:4319/security`. It runs `scripts/dashboard.js`, which delegates to the `aka` CLI: the web server is bundled in [`@alsoknownassecurity/cli`](../getting-started/cli.md), not the plugin, so the launcher spawns `aka dashboard` in the background and returns immediately (`--port <N>` is forwarded). If the `aka` CLI isn't installed it prints how to get it instead of failing.
+For the full graphical view, `/aka:dashboard` launches the OSS web-ui (the same one `aka dashboard` opens) against your local store and points the browser at `http://localhost:4319/security`. It runs `scripts/dashboard.js`, which delegates to the `aka` CLI: the web server is bundled in [`@akasecurity/cli`](../getting-started/cli.md), not the plugin, so the launcher spawns `aka dashboard` in the background and returns immediately (`--port <N>` is forwarded). If the `aka` CLI isn't installed it prints how to get it instead of failing.
 
 ## Configuration
 
@@ -169,7 +169,7 @@ For the full graphical view, `/aka:dashboard` launches the OSS web-ui (the same 
 }
 ```
 
-- **`runMode`** — `standalone` (default, no Docker) or `attached` (wired to a local backend). The runtime resolves its data path from this value via the **`DataGateway`** port (`@alsoknownassecurity/plugin-runtime`): standalone reads/writes the local SQLite store at `~/.aka/data/aka.db` (`@alsoknownassecurity/persistence`); attached goes through the backend's HTTP API (`@alsoknownassecurity/client`) and pulls the org's centrally-managed ruleset into a local cache that drives in-process detection.
+- **`runMode`** — `standalone` (default, no Docker) or `attached` (wired to a local backend). The runtime resolves its data path from this value via the **`DataGateway`** port (`@akasecurity/plugin-runtime`): standalone reads/writes the local SQLite store at `~/.aka/data/aka.db` (`@akasecurity/persistence`); attached goes through the backend's HTTP API (`@akasecurity/client`) and pulls the org's centrally-managed ruleset into a local cache that drives in-process detection.
 - **`policy`** — `redact` (replace sensitive values in place where the host allows) or `warn` (surface a warning, never modify content).
 - **`historicalAccess`** — `session-only` (default) or `full`. Consent for scanning pre-install surfaces — scratch/temp files, agent memory and prior conversation transcripts — for already-leaked secrets. Defaults to `session-only` so historical scanning is always an explicit opt-in, never an assumed grant on upgrade; declining still leaves AKA the working tree, the live session, git history and pointed scans to review.
 
@@ -197,7 +197,7 @@ Unconfigured is a valid state: until `/aka:setup` runs, detection still uses the
 ## Reading your local data (standalone)
 
 The **standalone** plugin writes `~/.aka/data/aka.db` and the OSS web dashboard
-reads that same store directly (`@alsoknownassecurity/persistence`, Server Components) — web
+reads that same store directly (`@akasecurity/persistence`, Server Components) — web
 dashboards over your local data with nothing leaving the machine and no server to
 run. Launch it with `aka dashboard` (see the [CLI](../getting-started/cli.md) and
 [Local / Single-Node](../deployment/local.md)).
@@ -223,7 +223,7 @@ Hooks invoke `node` at runtime, so `node` must be on the user's PATH — note th
 Load the plugin for a single session without a marketplace install:
 
 ```bash
-pnpm turbo run build --filter=@alsoknownassecurity/plugin-claude-code   # tsup bundles src → scripts/*.js (self-contained)
+pnpm turbo run build --filter=@akasecurity/plugin-claude-code   # tsup bundles src → scripts/*.js (self-contained)
 claude --plugin-dir ./apps/plugin-claude-code           # load for one session
 # after a rebuild, run /reload-plugins inside the session
 ```
@@ -235,8 +235,8 @@ Inside the session, `/hooks` lists the registered hooks (confirm `UserPromptSubm
 End users do **not** clone this repo. The plugin is distributed as a published npm package, listed in a Claude Code marketplace catalog (`.claude-plugin/marketplace.json` at the repo root):
 
 ```bash
-/plugin marketplace add alsoknownassecurity/ai-control-plane
-/plugin install aka@aka-control-plane
+/plugin marketplace add akasecurity/ai-tc
+/plugin install akasecurity@ai-tc
 ```
 
 Run these in the Claude Code **terminal CLI** (`claude`) — `/plugin` marketplace management is not exposed in the IDE/editor extension surfaces.
@@ -246,11 +246,11 @@ If you have the [`aka` CLI](../getting-started/cli.md) installed, `aka plugins i
 > **Pre-release distribution — private GitHub Packages.** While AKA is pre-release we
 > publish **only private artifacts to GitHub Packages** — nothing goes to the public npm
 > registry. The `/plugin install` above resolves an npm source, so it can only be fetched
-> with a valid `~/.npmrc` that points the `@alsoknownassecurity` scope at GitHub Packages
+> with a valid `~/.npmrc` that points the `@akasecurity` scope at GitHub Packages
 > **and** carries a GitHub token with `read:packages` access to our packages:
 >
 > ```ini
-> @alsoknownassecurity:registry=https://npm.pkg.github.com
+> @akasecurity:registry=https://npm.pkg.github.com
 > //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
 > ```
 >
@@ -258,9 +258,9 @@ If you have the [`aka` CLI](../getting-started/cli.md) installed, `aka plugins i
 > marketplace fetch fails with `401`/`403`. This requirement disappears once the project
 > is public.
 
-Why npm rather than a git source: a Claude Code marketplace install **copies the source as-is and never runs a build step**, and the hook scripts (`scripts/*.js`) are git-ignored. A `github` / `git-subdir` source would therefore ship a plugin whose `hooks.json` points at files that don't exist. The npm source instead ships the built, self-contained bundle (the `@alsoknownassecurity/*` workspace deps and `zod` are inlined by `tsup`, so the published package has **no runtime dependencies**). `node` must still be on the user's PATH — the hooks invoke it.
+Why npm rather than a git source: a Claude Code marketplace install **copies the source as-is and never runs a build step**, and the hook scripts (`scripts/*.js`) are git-ignored. A `github` / `git-subdir` source would therefore ship a plugin whose `hooks.json` points at files that don't exist. The npm source instead ships the built, self-contained bundle (the `@akasecurity/*` workspace deps and `zod` are inlined by `tsup`, so the published package has **no runtime dependencies**). `node` must still be on the user's PATH — the hooks invoke it.
 
-Releasing is automated by [`.github/workflows/release-plugin.yml`](https://github.com/alsoknownassecurity/ai-control-plane/blob/main/.github/workflows/release-plugin.yml):
+Releasing is automated by [`.github/workflows/release-plugin.yml`](https://github.com/akasecurity/ai-tc/blob/main/.github/workflows/release-plugin.yml):
 
 1. Bump `version` in both `apps/plugin-claude-code/package.json` and `.claude-plugin/plugin.json`.
 2. Push a tag `plugin-v<version>` (e.g. `plugin-v0.1.0`).

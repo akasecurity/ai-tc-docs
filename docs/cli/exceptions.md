@@ -1,4 +1,4 @@
-# Detection Exceptions
+# Adding Exceptions
 
 Sometimes AKA blocks a value you genuinely mean to use — a sandbox credential, a
 test fixture, a documented example key. A **detection exception** is the
