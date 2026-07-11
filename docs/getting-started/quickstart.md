@@ -1,44 +1,93 @@
 # Quickstart
 
-This guide takes you from zero to a working AKA installation with the Claude Code plugin active, events being captured, and findings appearing in the local dashboard — no backend, no Docker, no Postgres.
+Get the AKA plugin running in Claude Code, then confirm detection is live — no backend, no Docker, no Postgres.
 
-## Prerequisites
+## Install the plugin
 
-- **Node.js 26+** and **pnpm 10+**
-- **Claude Code** installed and signed in
+### Point Claude Code at the repo (recommended)
 
-## 1. Clone and install
+The fastest path — no clone, no build. Run these in the Claude Code **terminal CLI** (`claude`):
 
-```bash
-git clone https://github.com/your-org/ai-control-plane
-cd ai-control-plane
-pnpm setup   # pnpm install + lefthook hooks
-pnpm --filter @alsoknownassecurity/cli build
+```
+/plugin marketplace add akasecurity/ai-tc
+/plugin install akasecurity@ai-tc
 ```
 
-## 2. Set up your local AKA home
+Restart Claude Code afterwards to load the plugin.
+
+### claude-tools
+
+[`claude-tools`](https://github.com/akasecurity/claude-tools) can also install the AKA plugin as part of setting up a Claude Code profile — see that repo for the current install command.
+
+### Homebrew — coming soon
+
+### npm — coming soon
+
+## Onboard
+
+Inside a Claude Code session, run the onboarding wizard:
+
+```
+/aka:setup
+```
+
+This asks three questions (run mode, policy, historical scan consent) and writes your preferences to `~/.aka/settings/settings.json`. See [Configuration](configuration.md) for what each option means.
+
+## Verify it's working
+
+Submit a prompt containing a fake credential — the same shape a real secrets rule would match — and confirm AKA blocks it. See the fixtures in `rules/secrets/` for a concrete example payload.
+
+You should see a block message referencing `secrets/aws-access-key`. Then run `/aka:findings` or `/aka:health` to see it recorded.
+
+## Open the dashboard
+
+```
+/aka:dashboard
+```
+
+Navigate to `http://localhost:4319/security` to see the Events page.
+
+## What's next
+
+- [Write your first detection rule](../rules/writing-rules.md)
+- [The `aka` CLI](cli.md) for scanning, stats, and managing detection packs
+- [Claude Code plugin guide](../plugin/claude-code.md) for hook internals and configuration details
+
+---
+
+## Build from source (contributors)
+
+Building AKA from source instead of installing the published plugin — useful if you're developing AKA itself.
+
+**Prerequisites:** Node.js 26+ and pnpm 10+, Claude Code installed and signed in.
+
+### 1. Clone and install
 
 ```bash
-pnpm --filter @alsoknownassecurity/cli exec aka init
+git clone https://github.com/akasecurity/ai-tc
+cd ai-tc
+pnpm setup   # pnpm install + lefthook hooks
+pnpm --filter @akasecurity/cli build
+```
+
+### 2. Set up your local AKA home
+
+```bash
+pnpm --filter @akasecurity/cli exec aka init
 ```
 
 This creates `~/.aka/settings/settings.json` (your preferences) and
 `~/.aka/data/aka.db` (the local SQLite store), seeded with default detection
 policies.
 
-## 3. Install the Claude Code plugin
-
-From the repo root, load the plugin for a session:
+### 3. Load the plugin for a session
 
 ```bash
-pnpm turbo run build --filter=@alsoknownassecurity/plugin-claude-code
+pnpm turbo run build --filter=@akasecurity/plugin-claude-code
 claude --plugin-dir ./apps/plugin-claude-code
 ```
 
-See the [Claude Code plugin guide](../plugin/claude-code.md) for marketplace
-distribution and other install paths.
-
-## 4. Test the plugin hook
+### 4. Test the plugin hook
 
 Run the hook script directly with a sample payload — a fake credential in the
 same shape a real secrets rule would match — to verify it works:
@@ -51,18 +100,12 @@ echo '{"prompt":"here is a test credential: see rules/secrets fixtures for the e
 
 For a concrete example payload, see the fixtures in `rules/secrets/`.
 
-## 5. Open the dashboard
+### 5. Open the dashboard
 
 ```bash
-pnpm --filter @alsoknownassecurity/cli exec aka dashboard
+pnpm --filter @akasecurity/cli exec aka dashboard
 ```
 
 Navigate to `http://localhost:4319/security` to see the Events page. The
 finding from step 4 should appear once you've triggered it from inside a real
 Claude Code session (the direct hook invocation above only tests the script).
-
-## What's next
-
-- [Write your first detection rule](../rules/writing-rules.md)
-- [Install the plugin for your team](../plugin/claude-code.md)
-- [The `aka` CLI](cli.md) for scanning, stats, and managing detection packs

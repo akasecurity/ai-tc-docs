@@ -1,9 +1,22 @@
 # System Overview
 
+## Key concepts
+
+| Term          | Description                                                  |
+| ------------- | ------------------------------------------------------------ |
+| **Event**     | A prompt, response, or code change captured from a Claude session |
+| **Finding**   | A rule match produced by the detection engine against an event |
+| **Rule**      | A JSON file describing what to detect: keyword list, regex pattern, or validator |
+| **Rule Pack** | A directory of rules + mandatory fixtures with a `manifest.json` |
+| **Policy**    | A decision: what action to take when a rule or category fires |
+| **Plugin**    | The Claude Code extension (hooks) that intercepts sessions   |
+
+
+
 ## Repository layout
 
 ```
-ai-control-plane/
+ai-tc/
 ├── apps/
 │   ├── backend/          Fastify 5 API server (enterprise, per-customer control plane)
 │   ├── registry/         Fastify 5 global rule marketplace (cross-tenant, public read)
@@ -42,13 +55,13 @@ web-ui.
 AKA enforces strict import boundaries via the pnpm workspace graph + `tsc` (a forbidden import does not resolve / fails typecheck) and a dedicated CI gate (`pnpm check:boundaries`), not a lint plugin. Violating them is a CI failure.
 
 ```
-apps/plugin-*             →  @alsoknownassecurity/plugin-sdk, @alsoknownassecurity/plugin-runtime
-@alsoknownassecurity/plugin-runtime       →  @alsoknownassecurity/plugin-sdk, @alsoknownassecurity/persistence, @alsoknownassecurity/client, @alsoknownassecurity/schema
-@alsoknownassecurity/plugin-sdk           →  @alsoknownassecurity/detections, @alsoknownassecurity/client, @alsoknownassecurity/persistence, @alsoknownassecurity/schema
-@alsoknownassecurity/persistence          →  node:sqlite, @alsoknownassecurity/schema (no Drizzle, no @alsoknownassecurity/detections)
-@alsoknownassecurity/client               →  fetch (only package allowed to call fetch)
-@alsoknownassecurity/config               →  process.env (only package allowed to read env)
-@alsoknownassecurity/detections           →  @alsoknownassecurity/schema (no I/O, no Node-API deps)
+apps/plugin-*             →  @akasecurity/plugin-sdk, @akasecurity/plugin-runtime
+@akasecurity/plugin-runtime       →  @akasecurity/plugin-sdk, @akasecurity/persistence, @akasecurity/client, @akasecurity/schema
+@akasecurity/plugin-sdk           →  @akasecurity/detections, @akasecurity/client, @akasecurity/persistence, @akasecurity/schema
+@akasecurity/persistence          →  node:sqlite, @akasecurity/schema (no Drizzle, no @akasecurity/detections)
+@akasecurity/client               →  fetch (only package allowed to call fetch)
+@akasecurity/config               →  process.env (only package allowed to read env)
+@akasecurity/detections           →  @akasecurity/schema (no I/O, no Node-API deps)
 ```
 
 Three cross-cutting rules every contributor must remember:
@@ -60,32 +73,32 @@ Three cross-cutting rules every contributor must remember:
 ## Local-first plugin & optional backend (Phase 1)
 
 The plugin is fully useful with **zero backend and zero Docker**. The runtime
-depends on a single **`DataGateway`** port (defined in `@alsoknownassecurity/plugin-sdk`);
-`@alsoknownassecurity/plugin-runtime` resolves the implementation from the run mode:
+depends on a single **`DataGateway`** port (defined in `@akasecurity/plugin-sdk`);
+`@akasecurity/plugin-runtime` resolves the implementation from the run mode:
 
 - **standalone** (default) → a SQLite store at `~/.aka/data/aka.db` via
-  `@alsoknownassecurity/persistence` — the always-present writer of `events` and `findings`.
-- **attached** → the enterprise backend's HTTP API via `@alsoknownassecurity/client`; the plugin
+  `@akasecurity/persistence` — the always-present writer of `events` and `findings`.
+- **attached** → the enterprise backend's HTTP API via `@akasecurity/client`; the plugin
   also pulls the org's centrally-managed ruleset into a cache and detects with it.
 
 Detection runs in-process in either mode, and results surface through slash
 commands (`/aka:health`, `/aka:findings`, `/aka:recommend`, `/aka:audit`). The
-gateway and the shared data shapes live in `@alsoknownassecurity/plugin-sdk` / `@alsoknownassecurity/persistence`,
+gateway and the shared data shapes live in `@akasecurity/plugin-sdk` / `@akasecurity/persistence`,
 so a new plugin (Claude Code first, VSCode/Cursor later) adds only a thin
 tool-specific adapter, never a copy of the storage/detection logic.
 
 ```
- Claude Code ──hooks──▶ AKA plugin (adapter) ──▶ @alsoknownassecurity/plugin-sdk
+ Claude Code ──hooks──▶ AKA plugin (adapter) ──▶ @akasecurity/plugin-sdk
                                                       │ writes
                                                       ▼
         ~/.aka/data/aka.db   (events · findings · policies)   ◀── shared by all plugins
                 ▲                                   ▲
    OSS web-ui reads it directly            (Phase 2) enterprise sync
-   (@alsoknownassecurity/persistence, no server)       tenant-less wire → Postgres backend (HTTP)
+   (@akasecurity/persistence, no server)       tenant-less wire → Postgres backend (HTTP)
 ```
 
 For web dashboards over local data with no server, the **OSS web-ui** reads that
-same `aka.db` directly (`@alsoknownassecurity/persistence`, Server Components) — there is no
+same `aka.db` directly (`@akasecurity/persistence`, Server Components) — there is no
 local _enterprise backend_. The enterprise backend is Postgres-only; the plugin
 syncs to it over HTTP in `attached` mode (Phase 2), never over a shared SQLite
 file. In Phase 1 nothing leaves the machine.
@@ -112,7 +125,7 @@ file. In Phase 1 nothing leaves the machine.
 └────────────────────────────────────────────┘
                     │
                     ▼
-        ~/.aka/data/aka.db  (@alsoknownassecurity/persistence)
+        ~/.aka/data/aka.db  (@akasecurity/persistence)
 ```
 
 In `attached` mode the same event is additionally queued to the enterprise
@@ -129,16 +142,16 @@ mode there is no bundle to fetch — policy comes from the local store.
 ### Dashboard
 
 The OSS **web-ui** (`apps/web-ui`, Next.js) reads the local SQLite store
-directly through `@alsoknownassecurity/persistence` in Server Components — no
-`@alsoknownassecurity/client`, no HTTP, no rule registry. It renders the same
-presentational `*View` components from `@alsoknownassecurity/dashboard-ui`
+directly through `@akasecurity/persistence` in Server Components — no
+`@akasecurity/client`, no HTTP, no rule registry. It renders the same
+presentational `*View` components from `@akasecurity/dashboard-ui`
 that the enterprise dashboard does; enterprise-only affordances are injected
 as optional props (e.g. `FindingDetailView`'s `footer`,
 `DetectionDetailView`'s action callbacks) rather than forking the view. The
 **Detections** page adds a matching OSS read path (`db().detections` —
 list/detail/stats over `installed_packs`, reusing the pure
 `buildDetectionsList` / `rowToDetectionDetail` builders from
-`@alsoknownassecurity/schema` so shapes never drift from the hosted contract)
+`@akasecurity/schema` so shapes never drift from the hosted contract)
 plus the web-ui's **first local write path**: changing a detection's
 enforcement policy (or toggling it) is a Next.js Server Action that calls the
 persistence write facade and `revalidatePath`s the page. Import-from-library
@@ -149,10 +162,10 @@ The **Policies** page renders the shared built-in policy catalog (`db().policyCa
 
 ## API client generation
 
-`@alsoknownassecurity/client` is **generated**, not hand-maintained. The contract flows one way:
+`@akasecurity/client` is **generated**, not hand-maintained. The contract flows one way:
 
 ```
-@alsoknownassecurity/schema (Zod)  →  Fastify OpenAPI spec  →  @alsoknownassecurity/client (Hey API)
+@akasecurity/schema (Zod)  →  Fastify OpenAPI spec  →  @akasecurity/client (Hey API)
   single source        GET /openapi.json         typed SDK + TanStack Query
    of truth          (backend + registry)        options, sole fetch caller
 ```
@@ -164,10 +177,10 @@ generates `packages/client/src/generated/**` — **types only**, no runtime
 validation, since the server already validates and the types derive from the same
 Zod contracts. A thin hand-written wrapper (`src/index.ts`) keeps the stable public
 surface (`createClient` / `createRegistryClient` / `RegistryRequestError`, typed
-with `@alsoknownassecurity/schema`) and owns what codegen can't: the dual `x-api-key` + `Bearer`
+with `@akasecurity/schema`) and owns what codegen can't: the dual `x-api-key` + `Bearer`
 auth headers and per-instance `baseUrl`/`token`.
 
-Specs and generated output are committed; `pnpm --filter @alsoknownassecurity/client gen:openapi:check`
+Specs and generated output are committed; `pnpm --filter @akasecurity/client gen:openapi:check`
 regenerates and fails on drift (run in CI). Generated files are `@ts-nocheck`,
 ESLint-ignored, and Prettier-ignored — type-safety is enforced at the wrapper
 boundary and each call site.

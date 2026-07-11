@@ -32,7 +32,7 @@ So editing a rule means bumping `version` in its pack's `manifest.json`.
 
 ## Publishing the AKA Labs base rules (CI)
 
-The [`release-rules.yml`](https://github.com/alsoknownassecurity/ai-control-plane/blob/main/.github/workflows/release-rules.yml)
+The [`release-rules.yml`](https://github.com/akasecurity/ai-tc/blob/main/.github/workflows/release-rules.yml)
 workflow publishes everything under `rules/` to the `aka-labs` namespace:
 
 1. Bump `version` in each changed `rules/<pack>/manifest.json`.
@@ -44,17 +44,17 @@ Run the publisher locally against a dev registry:
 
 ```bash
 RULES_REGISTRY_URL=http://127.0.0.1:4555 RULES_PUBLISH_TOKEN=<token> \
-  pnpm --filter @alsoknownassecurity/rules-publisher exec tsx src/cli.ts --rules-dir rules
+  pnpm --filter @akasecurity/rules-publisher exec tsx src/cli.ts --rules-dir rules
 
 # validate only, no network/token:
-pnpm --filter @alsoknownassecurity/rules-publisher exec tsx src/cli.ts --rules-dir rules --dry-run
+pnpm --filter @akasecurity/rules-publisher exec tsx src/cli.ts --rules-dir rules --dry-run
 ```
 
 ## Running the registry locally
 
 ```bash
 RULES_PUBLISH_TOKEN=<≥16-char token> SQLITE_PATH=./registry.db PORT=4555 \
-  pnpm --filter @alsoknownassecurity/registry exec tsx src/main.ts
+  pnpm --filter @akasecurity/registry exec tsx src/main.ts
 ```
 
 In local/test mode the service seeds the `aka-labs` publisher and a token from `RULES_PUBLISH_TOKEN`

@@ -181,10 +181,10 @@ Structural rules over the plugin's [configuration-inventory scan](../plugin/clau
 ## Running the test suite
 
 ```bash
-pnpm --filter @alsoknownassecurity/detections test
+pnpm --filter @akasecurity/detections test
 
 # Watch mode during rule development
-pnpm --filter @alsoknownassecurity/detections test -- --watch
+pnpm --filter @akasecurity/detections test -- --watch
 ```
 
 Fixture tests auto-discover across all packs - no need to register new rules manually.

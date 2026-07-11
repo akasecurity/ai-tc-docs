@@ -1,0 +1,52 @@
+/* AKA brand colors, matched to akasecurity.io (navy ink + teal accent). */
+:root,
+[data-md-color-scheme='default'] {
+  --md-primary-fg-color: #ffffff;
+  --md-primary-fg-color--light: #ffffff;
+  --md-primary-fg-color--dark: #f6f8f9;
+  --md-primary-bg-color: #232f3e;
+  --md-accent-fg-color: #00e0b8;
+  --md-accent-fg-color--transparent: #00e0b81a;
+  --md-typeset-a-color: #0c8d77;
+}
+
+/* Material compiles the "black" primary swatch to hardcoded
+   [data-md-color-primary="black"] rules that set .md-header/.md-tabs
+   background-color directly (not via --md-primary-fg-color), so the
+   custom-property overrides above have no effect on them — these need
+   !important to win regardless of selector specificity/source order. */
+[data-md-color-scheme='default'] .md-header {
+  background-color: #ffffff !important;
+  color: #232f3e !important;
+}
+[data-md-color-scheme='default'] .md-tabs {
+  background-color: #ffffff !important;
+  color: #232f3e !important;
+}
+[data-md-color-scheme='default'] .md-search__form {
+  border-radius: 1.2rem !important;
+}
+[data-md-color-scheme='default'] .md-search__input {
+  background-color: #eceff2 !important;
+  color: #232f3e !important;
+  border-radius: 1.2rem !important;
+}
+[data-md-color-scheme='default'] .md-search__input::placeholder {
+  color: #6b7d8f !important;
+}
+[data-md-color-scheme='default'] .md-tabs__link {
+  color: #232f3ecc !important;
+}
+[data-md-color-scheme='default'] .md-tabs__link--active,
+[data-md-color-scheme='default'] .md-tabs__link:hover {
+  color: #232f3e !important;
+}
+
+[data-md-color-scheme='slate'] {
+  --md-primary-fg-color: #12181f;
+  --md-primary-fg-color--light: #1b2531;
+  --md-primary-fg-color--dark: #0c1116;
+  --md-accent-fg-color: #00e0b8;
+  --md-accent-fg-color--transparent: #00e0b81a;
+  --md-typeset-a-color: #7df8e2;
+}

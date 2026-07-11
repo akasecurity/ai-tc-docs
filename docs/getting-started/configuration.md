@@ -14,25 +14,3 @@ This is deliberate: hooks are bare processes Claude Code spawns, so
 environment variables set in your shell can't reach them — a file is the only
 reliable channel.
 
-## Modes
-
-`runMode` in `settings.json` picks the plugin's data path:
-
-- **`standalone`** (default) — reads/writes the local SQLite store directly
-  via `@alsoknownassecurity/persistence`. No server, no network, no account.
-- **`attached`** — points the plugin at an enterprise backend over its HTTP
-  API instead. Setting up and configuring the enterprise backend itself
-  (Postgres, Better Auth, multi-tenancy) is covered in the enterprise docs,
-  not here.
-
-## Generating a local token
-
-If you're running the optional local backend (`aka` CLI's bundled server) in
-`local`/`test` mode, it authenticates with a shared bearer token:
-
-```bash
-openssl rand -hex 32
-```
-
-Use the output as `AKA_LOCAL_TOKEN`, set identically in both the backend and
-the Claude Code plugin environment.
