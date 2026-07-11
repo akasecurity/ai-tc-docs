@@ -88,7 +88,7 @@ nav:
       - Configuration: getting-started/configuration.md
   - Plugin Guide:
       - Claude Code: plugin/claude-code.md
-      - Claude Desktop: plugin/claude-code.md
+      - Claude Desktop: plugin/claude-desktop.md
   - Detections:
       - Built-in Detections: rules/built-in.md
       - Writing Rules: rules/writing-rules.md

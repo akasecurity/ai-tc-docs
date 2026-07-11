@@ -615,6 +615,7 @@
   border-radius: 9999px;
   padding: 0.5rem 1.3rem;
   font-weight: 600;
+  font-size: 0.85rem;
   background: var(--aka-green);
   border: 1.5px solid var(--aka-green);
   color: var(--aka-ink);

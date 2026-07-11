@@ -170,7 +170,7 @@ Detects insecure code patterns across Python, JS/TS, Java, Ruby, PHP, and .NET. 
 
 ## config-posture
 
-Structural rules over the plugin's [configuration-inventory scan](../plugin/claude-code.md#configuration-inventory-scan-skills--hooks) (skills & hooks), evaluated once per session on `SessionStart`. Unlike the text packs above, these compare hook entries against each other, so they live as pure functions in `packages/detections/src/posture/` (fixture-tested like every pack) rather than in the regex rule format. Findings are observational (`warn`) and power the hook status/warning lines on the config read surface.
+Structural rules over the plugin's [configuration-inventory scan](../plugin/claude-code.md#configuration-inventory-scan-skills-hooks) (skills & hooks), evaluated once per session on `SessionStart`. Unlike the text packs above, these compare hook entries against each other, so they live as pure functions in `packages/detections/src/posture/` (fixture-tested like every pack) rather than in the regex rule format. Findings are observational (`warn`) and power the hook status/warning lines on the config read surface.
 
 | Rule                   | Severity | Fires when                                                                                                     |
 | ---------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |

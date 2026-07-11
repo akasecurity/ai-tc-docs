@@ -1,23 +1,34 @@
 # Quickstart
 
-Get the AKA plugin running in Claude Code, then confirm detection is live — no backend, no Docker, no Postgres.
+Get the AKA plugin running in your agent harness, then confirm detection is live — no backend, no Docker, no Postgres.
+
+AKA ships today as a Claude Code / Claude Desktop plugin (same package, same hooks), with support for additional harnesses (Cursor, GitHub Copilot, …) planned. Pick your harness below — everything after install is identical.
 
 ## Install the plugin
 
-### Point Claude Code at the repo (recommended)
+=== "Claude Code"
 
-The fastest path — no clone, no build. Run these in the Claude Code **terminal CLI** (`claude`):
+    The fastest path — no clone, no build. Run these in the Claude Code **terminal CLI** (`claude`):
 
-```
-/plugin marketplace add akasecurity/ai-tc
-/plugin install akasecurity@ai-tc
-```
+    ```
+    /plugin marketplace add akasecurity/ai-tc
+    /plugin install akasecurity@ai-tc
+    ```
 
-Restart Claude Code afterwards to load the plugin.
+    Restart Claude Code afterwards to load the plugin.
 
-### claude-tools
+    [`claude-tools`](https://github.com/akasecurity/claude-tools) can also install the AKA plugin as part of setting up a Claude Code profile — see that repo for the current install command.
 
-[`claude-tools`](https://github.com/akasecurity/claude-tools) can also install the AKA plugin as part of setting up a Claude Code profile — see that repo for the current install command.
+=== "Claude Desktop"
+
+    Claude Desktop has no terminal, so install from the GUI instead:
+
+    1. Open **Settings → Plugins**.
+    2. **Add marketplace** and enter `akasecurity/ai-tc`.
+    3. Find **aka** in the list and click **Install**.
+    4. Restart Claude Desktop.
+
+    See the [Claude Desktop plugin guide](../plugin/claude-desktop.md) for the full walkthrough.
 
 ### Homebrew — coming soon
 
@@ -25,7 +36,7 @@ Restart Claude Code afterwards to load the plugin.
 
 ## Onboard
 
-Inside a Claude Code session, run the onboarding wizard:
+Inside a session, run the onboarding wizard:
 
 ```
 /aka:setup
@@ -51,13 +62,13 @@ Navigate to `http://localhost:4319/security` to see the Events page.
 
 - [Write your first detection rule](../rules/writing-rules.md)
 - [The `aka` CLI](cli.md) for scanning, stats, and managing detection packs
-- [Claude Code plugin guide](../plugin/claude-code.md) for hook internals and configuration details
+- [Claude Code plugin guide](../plugin/claude-code.md) or [Claude Desktop plugin guide](../plugin/claude-desktop.md) for hook internals and configuration details
 
 ---
 
 ## Build from source (contributors)
 
-Building AKA from source instead of installing the published plugin — useful if you're developing AKA itself.
+Building AKA from source instead of installing the published plugin — useful if you're developing AKA itself. This workflow uses the Claude Code **terminal CLI**; there's no equivalent for Desktop, since it depends on shell access.
 
 **Prerequisites:** Node.js 26+ and pnpm 10+, Claude Code installed and signed in.
 
