@@ -41,7 +41,7 @@ Inside a session, run the onboarding wizard:
 /aka:setup
 ```
 
-This asks three questions (run mode, policy, historical scan consent) and writes your preferences to `~/.aka/settings/settings.json`. See [Configuration](configuration.md) for what each option means.
+This asks three questions (run mode, policy, historical scan consent) and writes your preferences to `~/.aka/settings/settings.json`.
 
 ## Verify it's working
 
@@ -59,6 +59,6 @@ Navigate to `http://localhost:4319/security` to see the Events page.
 
 ## What's next
 
-- Review the findings inside your harness with [`/aka:findings`](../usage#akafindings)
+- Review the findings inside your harness with [`/aka:findings`](usage.md#akafindings)
 - Use [the `aka` CLI](cli.md) for scanning, stats, and managing detection packs
 - [Claude Code plugin guide](../plugins/claude-code.md) or [Claude Desktop plugin guide](../plugins/claude-desktop.md) for hook internals and configuration details

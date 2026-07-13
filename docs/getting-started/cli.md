@@ -34,7 +34,7 @@ What you get:
 - **A GitHub token with `read:packages`** — **only while AKA is pre-release.** The CLI
   is published to **private GitHub Packages** during stealth, so installing it needs
   authentication. This requirement goes away when the project is public. See
-  [Authenticating to GitHub Packages](#authenticating-to-github-packages-pre-release).
+  [Authenticating to GitHub Packages](../plugins/claude-code.md#distribution-marketplace-npm).
 
 ---
 

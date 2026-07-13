@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "python3 -m mkdocs serve --dev-addr 0.0.0.0:8000",
+    "dev": "DOCS_SITE_URL=http://localhost:8000 python3 -m mkdocs serve --dev-addr 0.0.0.0:8000",
     "build": "python3 -m mkdocs build --strict",
     "clean": "rm -rf site"
   }
