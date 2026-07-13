@@ -520,8 +520,22 @@
   fill: rgba(255, 255, 255, 0.6);
 }
 .mdx-flow__arrow {
+  fill: none;
   stroke: rgba(255, 255, 255, 0.25);
   stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 3 4;
+  animation: mdx-flow-move 1s linear infinite;
+}
+@keyframes mdx-flow-move {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mdx-flow__arrow {
+    animation: none;
+  }
 }
 .mdx-flow__arrowhead {
   fill: rgba(255, 255, 255, 0.25);
@@ -531,12 +545,12 @@
   font-weight: 600;
   text-anchor: middle;
 }
-.mdx-flow__outcome--allow {
+.mdx-flow__outcome--monitor {
   fill: rgba(0, 224, 184, 0.12);
   stroke: var(--aka-green);
   stroke-width: 1.5;
 }
-.mdx-flow__outcome-label--allow {
+.mdx-flow__outcome-label--monitor {
   fill: var(--aka-green);
 }
 .mdx-flow__outcome--warn {
@@ -562,6 +576,14 @@
 }
 .mdx-flow__outcome-label--block {
   fill: var(--aka-red);
+}
+.mdx-flow__outcome--exception {
+  fill: rgba(154, 170, 187, 0.14);
+  stroke: var(--aka-fg3);
+  stroke-width: 1.5;
+}
+.mdx-flow__outcome-label--exception {
+  fill: var(--aka-fg3);
 }
 .mdx-flagship__title {
   display: flex;
@@ -871,6 +893,14 @@
 [data-md-color-scheme='slate'] .mdx-diagram__node-label--accent {
   fill: var(--aka-green);
 }
+.mdx-diagram__node-sub {
+  font-size: 10px;
+  text-anchor: middle;
+  fill: var(--aka-fg2);
+}
+[data-md-color-scheme='slate'] .mdx-diagram__node-sub {
+  fill: rgba(255, 255, 255, 0.6);
+}
 .mdx-diagram__arrow {
   stroke: var(--aka-fg3);
   stroke-width: 1.5;
@@ -887,6 +917,18 @@
 .mdx-diagram__arrow-label {
   font-size: 10px;
   fill: var(--aka-fg2);
+}
+
+/* Pulse dots traveling along .mdx-diagram__arrow paths — animated via SMIL
+   <animateMotion> on each <circle>, not CSS, so it needs no per-path keyframes. */
+.mdx-diagram__pulse {
+  fill: var(--aka-green);
+  filter: drop-shadow(0 0 3px rgba(0, 224, 184, 0.7));
+}
+@media (prefers-reduced-motion: reduce) {
+  .mdx-diagram__pulse {
+    display: none;
+  }
 }
 
 /* Detections section — mirrors .mdx-local back to copy-left / visual-right. */

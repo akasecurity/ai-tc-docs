@@ -1,6 +1,13 @@
+---
+comments: true
+---
+
 # Claude Desktop Plugin
 
-Claude Desktop runs the **same plugin package** as Claude Code — `apps/plugin-claude-code`, identical hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`), the same fail-open guarantee, the same local SQLite store (`~/.aka/data/aka.db`), and the same `/aka:*` commands. See the [Claude Code plugin guide](claude-code.md) for the full architecture, hook contract, and command reference — this page only covers what's different about running it inside Desktop.
+!!! note
+    Claude Desktop runs the **same plugin package** as Claude Code — `apps/plugin-claude-code`, identical hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`), the same fail-open guarantee, the same local SQLite store (`~/.aka/data/aka.db`), and the same `/aka:*` commands. 
+    
+    See the [Claude Code plugin guide](claude-code.md) for the full architecture, hook contract, and command reference — this page only covers what's different about running it inside Desktop.
 
 ## Installing
 
@@ -11,7 +18,7 @@ Claude Desktop has no terminal, so plugin management happens in **Settings → P
 3. Find **aka** in the installed marketplace's plugin list and click **Install**.
 4. Restart Claude Desktop to load the plugin.
 
-> **Pre-release — private GitHub Packages.** Same requirement as Claude Code: while AKA is pre-release, the marketplace resolves an npm source hosted on private GitHub Packages, so Desktop's install step still needs a `~/.npmrc` on the machine pointing the `@akasecurity` scope at `npm.pkg.github.com` with a `read:packages` token. See [Claude Code → Distribution](claude-code.md#distribution-marketplace-npm) for the exact `.npmrc` lines — write it once before clicking Install.
+Removing it later? See [Uninstalling](uninstalling.md).
 
 ## Onboarding and everyday use
 

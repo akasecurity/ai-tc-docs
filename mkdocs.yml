@@ -1,6 +1,6 @@
 site_name: aka AI-TC
 site_description: Intercept, inspect, and govern AI prompts and responses across your engineering org
-site_url: !ENV [DOCS_SITE_URL, 'https://akasecurity.github.io/docs/']
+site_url: !ENV [DOCS_SITE_URL, 'https://akasecurity.github.io/ai-tc-docs/']
 repo_name: akasecurity/ai-tc
 repo_url: https://github.com/akasecurity/ai-tc
 docs_dir: docs
@@ -41,7 +41,11 @@ theme:
 markdown_extensions:
   - admonition
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.highlight:
       anchor_linenums: true
       line_spans: __span
@@ -73,6 +77,14 @@ extra:
     - icon: fontawesome/brands/npm
       link: https://www.npmjs.com/org/akasecurity
       name: npm
+  consent:
+    title: Cookies and third-party embeds
+    description: >-
+      Pages with a comments section embed a giscus widget, which loads content
+      from GitHub and sets its own cookies to let you react to and post
+      comments. We use no other cookies or analytics.
+    cookies:
+      github: GitHub (giscus comments)
 
 extra_css:
   - https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700&family=Public+Sans:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap
@@ -82,17 +94,23 @@ extra_css:
 nav:
   - Home: index.md
   - Getting Started:
-      - Quickstart: getting-started/quickstart.md
+      - Installation: getting-started/installation.md
+      - How it works: getting-started/how-it-works.md
       - Usage: getting-started/usage.md
-      - Adding Exceptions: cli/exceptions.md
-      - Configuration: getting-started/configuration.md
+      - Adding Exceptions: getting-started/exceptions.md
+      - Using the CLI: getting-started/cli.md
+      - Updates: getting-started/updates.md
+      - Contributing: getting-started/contributing.md
   - Plugin Guide:
-      - Claude Code: plugin/claude-code.md
-      - Claude Desktop: plugin/claude-desktop.md
+      - Claude Code: plugins/claude-code.md
+      - Claude Desktop: plugins/claude-desktop.md
+      - Uninstalling: plugins/uninstalling.md
   - Detections:
       - Built-in Detections: rules/built-in.md
       - Writing Rules: rules/writing-rules.md
       - Publishing: rules/publishing.md
-  - Architecture Reference:
+  - Architecture:
       - System Overview: architecture/overview.md
+      - Data Flow: architecture/data-flow.md
       - Detection Engine: architecture/detection-engine.md
+      - Physical Design: architecture/physical-design.md

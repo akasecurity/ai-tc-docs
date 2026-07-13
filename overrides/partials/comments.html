@@ -1,0 +1,38 @@
+{% if page.meta.comments %}
+<h2 id="__comments">{{ lang.t("meta.comments") }}</h2>
+
+<!--
+  giscus (https://giscus.app) backed by GitHub Discussions on
+  akasecurity/ai-tc — the product monorepo, so doc comments live
+  alongside the code they document.
+
+  Only injected once the reader has accepted the "github" cookie in the
+  consent banner (see extra.consent in mkdocs.yml); Material stores that
+  decision under the "__consent" key read via __md_get.
+-->
+<script>
+  var consent = __md_get("__consent")
+  if (consent && consent.github) {
+    var script = document.createElement("script")
+    script.src = "https://giscus.app/client.js"
+    script.setAttribute("data-repo", "akasecurity/ai-tc")
+    script.setAttribute("data-repo-id", "R_kgDOTUzSng")
+    script.setAttribute("data-category", "Announcements")
+    script.setAttribute("data-category-id", "DIC_kwDOTUzSns4DBHHp")
+    script.setAttribute("data-mapping", "pathname")
+    script.setAttribute("data-strict", "0")
+    script.setAttribute("data-reactions-enabled", "1")
+    script.setAttribute("data-emit-metadata", "0")
+    script.setAttribute("data-input-position", "bottom")
+    script.setAttribute("data-theme", "preferred_color_scheme")
+    script.setAttribute("data-lang", "en")
+    script.crossOrigin = "anonymous"
+    script.async = true
+    document.currentScript.replaceWith(script)
+  } else {
+    var notice = document.createElement("p")
+    notice.textContent = "Comments are disabled until you accept the GitHub cookie in the consent banner."
+    document.currentScript.replaceWith(notice)
+  }
+</script>
+{% endif %}
