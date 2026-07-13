@@ -21,7 +21,6 @@
             scans them against your rule packs, and enforces policy &mdash;
             entirely on your machine, with zero backend.
           </p>
-          <p class="mdx-hero__mono">always local &middot; ~/.aka/data/aka.db</p>
           <div class="mdx-hero__cta">
             <a class="md-button md-button--primary" href="#quick-start">Quick Start</a>
             <a class="md-button" href="https://github.com/akasecurity/ai-tc">GitHub</a>
@@ -108,11 +107,12 @@
             <span>Traffic flow</span>
           </div>
           <div class="mdx-flow__body">
-            <svg viewBox="0 0 420 300" role="img" aria-label="Prompts, tool calls, responses, and file reads flow into the AKA control node, which routes each one to allow, warn, redact, or block.">
-              <line class="mdx-flow__arrow" x1="124" y1="25" x2="176" y2="112" marker-end="url(#mdx-flow-arrowhead)" />
-              <line class="mdx-flow__arrow" x1="124" y1="89" x2="176" y2="117" marker-end="url(#mdx-flow-arrowhead)" />
-              <line class="mdx-flow__arrow" x1="124" y1="153" x2="176" y2="125" marker-end="url(#mdx-flow-arrowhead)" />
-              <line class="mdx-flow__arrow" x1="124" y1="217" x2="176" y2="130" marker-end="url(#mdx-flow-arrowhead)" />
+            <svg viewBox="0 0 420 300" role="img" aria-label="Prompts, tool calls, responses, and file reads flow into the AKA control node, which routes each one to monitor, warn, redact, block, or a manual exception.">
+              <path class="mdx-flow__arrow" d="M124,25 C135,25 135,132 145,132" />
+              <path class="mdx-flow__arrow" d="M124,89 C135,89 135,132 145,132" />
+              <path class="mdx-flow__arrow" d="M124,153 C135,153 135,132 145,132" />
+              <path class="mdx-flow__arrow" d="M124,217 C135,217 135,132 145,132" />
+              <path class="mdx-flow__arrow" d="M145,132 L153,132" marker-end="url(#mdx-flow-arrowhead)" />
 
               <rect class="mdx-flow__node" x="6" y="10" width="118" height="30" rx="6" />
               <text class="mdx-flow__node-label" x="65" y="29">Prompts</text>
@@ -123,26 +123,29 @@
               <rect class="mdx-flow__node" x="6" y="202" width="118" height="30" rx="6" />
               <text class="mdx-flow__node-label" x="65" y="221">File reads</text>
 
-              <line class="mdx-flow__arrow" x1="286" y1="112" x2="308" y2="25" marker-end="url(#mdx-flow-arrowhead)" />
-              <line class="mdx-flow__arrow" x1="286" y1="117" x2="308" y2="89" marker-end="url(#mdx-flow-arrowhead)" />
-              <line class="mdx-flow__arrow" x1="286" y1="125" x2="308" y2="153" marker-end="url(#mdx-flow-arrowhead)" />
-              <line class="mdx-flow__arrow" x1="286" y1="130" x2="308" y2="217" marker-end="url(#mdx-flow-arrowhead)" />
+              <path class="mdx-flow__arrow" d="M271,113 C290,113 290,24 300,24" marker-end="url(#mdx-flow-arrowhead)" />
+              <path class="mdx-flow__arrow" d="M271,124 C290,124 290,78 300,78" marker-end="url(#mdx-flow-arrowhead)" />
+              <path class="mdx-flow__arrow" d="M271,132 C290,132 290,132 300,132" marker-end="url(#mdx-flow-arrowhead)" />
+              <path class="mdx-flow__arrow" d="M271,140 C290,140 290,186 300,186" marker-end="url(#mdx-flow-arrowhead)" />
+              <path class="mdx-flow__arrow" d="M271,151 C290,151 290,240 300,240" marker-end="url(#mdx-flow-arrowhead)" />
 
-              <rect class="mdx-flow__control" x="176" y="94" width="110" height="54" rx="8" />
-              <text class="mdx-flow__control-label" x="231" y="117">AKA</text>
-              <text class="mdx-flow__control-sub" x="231" y="134">policy engine</text>
+              <rect class="mdx-flow__control" x="161" y="105" width="110" height="54" rx="8" />
+              <text class="mdx-flow__control-label" x="216" y="128">AKA</text>
+              <text class="mdx-flow__control-sub" x="216" y="145">policy engine</text>
 
-              <rect class="mdx-flow__outcome mdx-flow__outcome--allow" x="308" y="10" width="104" height="30" rx="6" />
-              <text class="mdx-flow__outcome-label mdx-flow__outcome-label--allow" x="360" y="29">Allow</text>
-              <rect class="mdx-flow__outcome mdx-flow__outcome--warn" x="308" y="74" width="104" height="30" rx="6" />
-              <text class="mdx-flow__outcome-label mdx-flow__outcome-label--warn" x="360" y="93">Warn</text>
-              <rect class="mdx-flow__outcome mdx-flow__outcome--redact" x="308" y="138" width="104" height="30" rx="6" />
-              <text class="mdx-flow__outcome-label mdx-flow__outcome-label--redact" x="360" y="157">Redact</text>
-              <rect class="mdx-flow__outcome mdx-flow__outcome--block" x="308" y="202" width="104" height="30" rx="6" />
-              <text class="mdx-flow__outcome-label mdx-flow__outcome-label--block" x="360" y="221">Block</text>
+              <rect class="mdx-flow__outcome mdx-flow__outcome--monitor" x="308" y="10" width="104" height="28" rx="6" />
+              <text class="mdx-flow__outcome-label mdx-flow__outcome-label--monitor" x="360" y="28">Monitor</text>
+              <rect class="mdx-flow__outcome mdx-flow__outcome--warn" x="308" y="64" width="104" height="28" rx="6" />
+              <text class="mdx-flow__outcome-label mdx-flow__outcome-label--warn" x="360" y="82">Warn</text>
+              <rect class="mdx-flow__outcome mdx-flow__outcome--redact" x="308" y="118" width="104" height="28" rx="6" />
+              <text class="mdx-flow__outcome-label mdx-flow__outcome-label--redact" x="360" y="136">Redact</text>
+              <rect class="mdx-flow__outcome mdx-flow__outcome--block" x="308" y="172" width="104" height="28" rx="6" />
+              <text class="mdx-flow__outcome-label mdx-flow__outcome-label--block" x="360" y="190">Block</text>
+              <rect class="mdx-flow__outcome mdx-flow__outcome--exception" x="308" y="226" width="104" height="28" rx="6" />
+              <text class="mdx-flow__outcome-label mdx-flow__outcome-label--exception" x="360" y="244">Exception</text>
 
               <defs>
-                <marker id="mdx-flow-arrowhead" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
+                <marker id="mdx-flow-arrowhead" markerWidth="8" markerHeight="8" refX="0" refY="4" orient="auto">
                   <path class="mdx-flow__arrowhead" d="M0,0 L8,4 L0,8 Z" />
                 </marker>
               </defs>
@@ -168,7 +171,7 @@
           </div>
           <div class="mdx-flagship__cta">
             <a class="md-button md-button--primary" href="https://github.com/akasecurity/ai-tc">GitHub</a>
-            <a class="mdx-flagship__link" href="architecture/">How it works &rarr;</a>
+            <a class="mdx-flagship__link" href="getting-started/how-it-works/">How it works &rarr;</a>
           </div>
         </div>
       </div>
@@ -286,7 +289,7 @@
           Postgres, no account to create.
         </p>
         <p class="mdx-install__more">
-          See the <a href="deployment/local/">Local Mode guide</a> for how
+          See the <a href="getting-started/cli/">CLI guide</a> for how
           the plugin, CLI, and dashboard all share that single local store.
         </p>
       </div>
@@ -337,28 +340,28 @@
 
   <section class="mdx-features">
     <div class="mdx-features__grid">
-      <a class="mdx-feature" href="architecture/">
+      <a class="mdx-feature" href="getting-started/how-it-works/">
         <span class="mdx-feature__tag">01</span>
         <span class="mdx-feature__title">Architecture</span>
         <span class="mdx-feature__desc">How the plugin, detection engine, and local SQLite store fit together.</span>
         <span class="mdx-feature__arrow">&rarr;</span>
       </a>
-      <a class="mdx-feature" href="detections/">
+      <a class="mdx-feature" href="rules/built-in/">
         <span class="mdx-feature__tag">02</span>
         <span class="mdx-feature__title">Detections</span>
-        <span class="mdx-feature__desc">View our open source library of detections.</span>
+        <span class="mdx-feature__desc">View our open source library of 100+ detections.</span>
         <span class="mdx-feature__arrow">&rarr;</span>
       </a>
-      <a class="mdx-feature" href="detections/">
+      <a class="mdx-feature" href="https://github.com/akasecurity/flightcrew-skills">
           <span class="mdx-feature__tag">03</span>
-          <span class="mdx-feature__title">Detections</span>
-          <span class="mdx-feature__desc">View our open source library of detections.</span>
+          <span class="mdx-feature__title">Flightcrew Skills</span>
+          <span class="mdx-feature__desc">A second opinion before you merge — multi-model code review for coding agents.</span>
           <span class="mdx-feature__arrow">&rarr;</span>
         </a>
-        <a class="mdx-feature" href="detections/">
+        <a class="mdx-feature" href="https://github.com/akasecurity/claude-tools">
           <span class="mdx-feature__tag">04</span>
-          <span class="mdx-feature__title">Detections</span>
-          <span class="mdx-feature__desc">View our open source library of detections.</span>
+          <span class="mdx-feature__title">Claude Tools</span>
+          <span class="mdx-feature__desc">Make Claude Code safer to use. Clean context, locked-down credentials, guarded egress.</span>
           <span class="mdx-feature__arrow">&rarr;</span>
         </a>
     </div>

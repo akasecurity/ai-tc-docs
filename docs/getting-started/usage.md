@@ -1,3 +1,7 @@
+---
+comments: true
+---
+
 # Usage
 
 The most common way to work with AKA day-to-day is the `/aka:*` slash commands, run from inside a Claude Code or Claude Desktop session — the same plugin, same commands either way. They're all read-only and backed by the local SQLite store (`~/.aka/data/aka.db`), so they work with zero backend.
@@ -45,4 +49,4 @@ Check this before assuming a detection will fire — if something you expected t
 
 Check this before writing a new rule (to avoid duplicating an existing pack) or before running `aka detections update`, to see what's currently installed versus what's available.
 
-See the [Claude Code plugin guide](../plugin/claude-code.md#read-surface-slash-commands) for the full detail on each command.
+See the [Claude Code plugin guide](../plugins/claude-code.md#read-surface-slash-commands) for the full detail on each command.
