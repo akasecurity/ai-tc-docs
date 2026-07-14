@@ -63,7 +63,7 @@ Applies a regular expression with optional flags.
 ```
 
 !!! note "Statement-level patterns"
-Use `\b` word boundaries in regex patterns to avoid false positives from substrings.
+    Use `\b` word boundaries in regex patterns to avoid false positives from substrings.
 
 ### validator (coming soon)
 
