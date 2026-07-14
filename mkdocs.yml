@@ -9,6 +9,9 @@ site_dir: site
 theme:
   name: material
   custom_dir: overrides
+  # Fonts are loaded manually via extra_css (Hanken Grotesk / Public Sans /
+  # Geist Mono, matching akasecurity.io); disable Material's Roboto autoload.
+  font: false
   logo: assets/icon.svg
   favicon: assets/logomark.svg
   palette:

@@ -1,3 +1,22 @@
+/* AKA typography, matched to akasecurity.io:
+   Public Sans (body) / Hanken Grotesk (headings) / Geist Mono (code).
+   Fonts are imported via the Google Fonts entry in mkdocs.yml extra_css. */
+:root {
+  --md-text-font: 'Public Sans';
+  --md-code-font: 'Geist Mono';
+}
+
+/* Material has no dedicated heading font variable — headings inherit
+   --md-text-font — so map them to the site's display face explicitly. */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4,
+.md-typeset h5,
+.md-typeset h6 {
+  font-family: 'Hanken Grotesk', var(--md-text-font-family), system-ui, sans-serif;
+}
+
 /* AKA brand colors, matched to akasecurity.io (navy ink + teal accent). */
 :root,
 [data-md-color-scheme='default'] {
