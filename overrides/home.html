@@ -240,44 +240,7 @@
 
   <section class="mdx-install mdx-local" id="local-architecture">
     <div class="mdx-install__card mdx-local__card">
-      <div class="mdx-diagram">
-        <div class="mdx-terminal__bar mdx-diagram__bar">
-          <span>Local architecture</span>
-        </div>
-        <div class="mdx-diagram__body">
-          <svg viewBox="0 0 380 366" role="img" aria-label="Claude Code talks to the AKA plugin, which writes to a local SQLite store that the dashboard and CLI read directly, all inside your machine with no backend.">
-            <rect class="mdx-diagram__boundary" x="10" y="34" width="360" height="322" rx="14" />
-            <text class="mdx-diagram__boundary-label" x="28" y="24">your machine &middot; no backend</text>
-
-            <rect class="mdx-diagram__node" x="50" y="52" width="280" height="46" rx="8" />
-            <text class="mdx-diagram__node-label" x="190" y="80">Claude Code</text>
-
-            <line class="mdx-diagram__arrow" x1="190" y1="98" x2="190" y2="130" marker-end="url(#mdx-diagram-arrowhead)" />
-            <text class="mdx-diagram__arrow-label" x="204" y="118">hooks</text>
-
-            <rect class="mdx-diagram__node" x="50" y="132" width="280" height="46" rx="8" />
-            <text class="mdx-diagram__node-label" x="190" y="160">AKA plugin</text>
-
-            <line class="mdx-diagram__arrow" x1="190" y1="178" x2="190" y2="210" marker-end="url(#mdx-diagram-arrowhead)" />
-            <text class="mdx-diagram__arrow-label" x="204" y="198">writes</text>
-
-            <rect class="mdx-diagram__node mdx-diagram__node--accent" x="50" y="212" width="280" height="46" rx="8" />
-            <text class="mdx-diagram__node-label mdx-diagram__node-label--accent" x="190" y="240">~/.aka/data/aka.db</text>
-
-            <line class="mdx-diagram__arrow" x1="190" y1="258" x2="190" y2="290" marker-end="url(#mdx-diagram-arrowhead)" />
-            <text class="mdx-diagram__arrow-label" x="204" y="278">reads</text>
-
-            <rect class="mdx-diagram__node" x="50" y="292" width="280" height="46" rx="8" />
-            <text class="mdx-diagram__node-label" x="190" y="320">Dashboard / CLI</text>
-
-            <defs>
-              <marker id="mdx-diagram-arrowhead" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto">
-                <path class="mdx-diagram__arrowhead" d="M0,0 L8,4 L0,8 Z" />
-              </marker>
-            </defs>
-          </svg>
-        </div>
-      </div>
+      {% include "partials/local_arch_diagram.html" %}
 
       <div class="mdx-install__copy">
         <p class="mdx-install__eyebrow">Runs entirely on your machine</p>
