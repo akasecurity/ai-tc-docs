@@ -21,35 +21,35 @@ a manually-granted **Exception**.
       <text class="mdx-diagram__node-label" x="190" y="30">Plugin</text>
       <text class="mdx-diagram__node-sub" x="190" y="48">Hooks that intercept harness sessions</text>
 
-      <line class="mdx-diagram__arrow" x1="190" y1="60" x2="190" y2="92" marker-end="url(#concept-diagram-arrowhead)" />
+      <line class="mdx-diagram__arrow" x1="190" y1="60" x2="190" y2="88" marker-end="url(#concept-diagram-arrowhead)" />
       <text class="mdx-diagram__arrow-label" x="204" y="80">captures</text>
 
       <rect class="mdx-diagram__node" x="20" y="100" width="340" height="50" rx="8" />
       <text class="mdx-diagram__node-label" x="190" y="120">Event</text>
       <text class="mdx-diagram__node-sub" x="190" y="138">Prompt, response, or code change</text>
 
-      <line class="mdx-diagram__arrow" x1="190" y1="150" x2="190" y2="182" marker-end="url(#concept-diagram-arrowhead)" />
+      <line class="mdx-diagram__arrow" x1="190" y1="150" x2="190" y2="178" marker-end="url(#concept-diagram-arrowhead)" />
       <text class="mdx-diagram__arrow-label" x="204" y="170">scanned against</text>
 
       <rect class="mdx-diagram__node" x="20" y="190" width="340" height="50" rx="8" />
       <text class="mdx-diagram__node-label" x="190" y="210">Rule Pack</text>
       <text class="mdx-diagram__node-sub" x="190" y="228">Rules + fixtures, by category</text>
 
-      <line class="mdx-diagram__arrow" x1="190" y1="240" x2="190" y2="272" marker-end="url(#concept-diagram-arrowhead)" />
+      <line class="mdx-diagram__arrow" x1="190" y1="240" x2="190" y2="268" marker-end="url(#concept-diagram-arrowhead)" />
       <text class="mdx-diagram__arrow-label" x="204" y="260">produces</text>
 
       <rect class="mdx-diagram__node mdx-diagram__node--accent" x="20" y="280" width="340" height="50" rx="8" />
       <text class="mdx-diagram__node-label mdx-diagram__node-label--accent" x="190" y="300">Finding</text>
       <text class="mdx-diagram__node-sub" x="190" y="318">A rule match against an event</text>
 
-      <line class="mdx-diagram__arrow" x1="190" y1="330" x2="190" y2="362" marker-end="url(#concept-diagram-arrowhead)" />
+      <line class="mdx-diagram__arrow" x1="190" y1="330" x2="190" y2="358" marker-end="url(#concept-diagram-arrowhead)" />
       <text class="mdx-diagram__arrow-label" x="204" y="350">resolved by</text>
 
       <rect class="mdx-diagram__node" x="20" y="370" width="340" height="50" rx="8" />
       <text class="mdx-diagram__node-label" x="190" y="390">Policy</text>
       <text class="mdx-diagram__node-sub" x="190" y="408">Maps a rule or category to an action</text>
 
-      <line class="mdx-diagram__arrow" x1="190" y1="420" x2="190" y2="452" marker-end="url(#concept-diagram-arrowhead)" />
+      <line class="mdx-diagram__arrow" x1="190" y1="420" x2="190" y2="448" marker-end="url(#concept-diagram-arrowhead)" />
       <text class="mdx-diagram__arrow-label" x="204" y="440">results in</text>
 
       <rect class="mdx-diagram__node" x="20" y="460" width="340" height="50" rx="8" />
