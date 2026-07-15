@@ -1,5 +1,14 @@
 {% extends "main.html" %}
 
+{#
+  Home-page browser tab title. Overrides Material's default (which produced a
+  duplicated "aka AI-TC - aka AI-TC") so the tab matches the social card. Only
+  affects the home page; interior pages keep their per-page titles.
+#}
+{% block htmltitle %}
+  <title>AKA Security — AI Traffic Control (AI-TC)</title>
+{% endblock %}
+
 {% block tabs %}
   {{ super() }}
 
