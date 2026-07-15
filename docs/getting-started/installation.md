@@ -11,8 +11,8 @@ comments: true
     The fastest path — no clone, no build. Run these in the Claude Code **terminal CLI** (`claude`):
 
     ```
-    /plugin marketplace add akasecurity/ai-tc
-    /plugin install akasecurity@ai-tc
+    /plugin marketplace add akasecurity/marketplace
+    /plugin install ai-tc@akasecurity
     ```
 
     Restart Claude Code afterwards to load the plugin.
@@ -24,7 +24,7 @@ comments: true
     Claude Desktop has no terminal, so install from the GUI instead:
 
     1. Open **Settings → Plugins**.
-    2. **Add marketplace** and enter `akasecurity/ai-tc`.
+    2. **Add marketplace** and enter `akasecurity/marketplace`.
     3. Find **aka** in the list and click **Install**.
     4. Restart Claude Desktop.
 
