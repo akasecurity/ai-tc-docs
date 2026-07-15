@@ -190,9 +190,8 @@
         </p>
         <p class="mdx-install__more">
           See the full <a href="getting-started/quickstart/">Quickstart guide</a>
-          for the step-by-step walkthrough &mdash; cloning, installing the
-          Claude Code plugin, triggering a detection, and opening the
-          dashboard.
+          for the step-by-step walkthrough &mdash; installing the Claude Code
+          plugin, triggering a detection, and opening the dashboard.
         </p>
       </div>
       <div class="mdx-terminal">
@@ -202,14 +201,14 @@
             <span data-mdx-copy-label>Copy</span>
           </button>
         </div>
-        <pre class="mdx-terminal__pre" data-mdx-copy-source><span class="cmt"># clone and set up</span>
-<span class="pmt">$</span> git clone https://github.com/akasecurity/ai-tc
-<span class="pmt">$</span> cd ai-tc
-<span class="pmt">$</span> pnpm setup
-<span class="pmt">$</span> pnpm --filter @akasecurity/cli build
+        <pre class="mdx-terminal__pre" data-mdx-copy-source><span class="cmt"># In the Claude Code CLI</span>
+/plugin marketplace add akasecurity/marketplace
+/plugin install ai-tc@akasecurity
+/aka:setup
 
-<span class="cmt"># launch the local dashboard</span>
-<span class="pmt">$</span> pnpm --filter @akasecurity/cli exec aka dashboard</pre>
+<span class="cmt"># or the local-first CLI (macOS / Linux)</span>
+<span class="pmt">$</span> curl -fsSL https://akasecurity.io/install.sh | sh
+<span class="pmt">$</span> aka init</pre>
       </div>
     </div>
   </section>
