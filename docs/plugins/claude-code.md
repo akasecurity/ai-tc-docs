@@ -236,8 +236,8 @@ Inside the session, `/hooks` lists the registered hooks (confirm `UserPromptSubm
 End users do **not** clone this repo. The plugin is distributed as a published npm package, listed in a Claude Code marketplace catalog (`.claude-plugin/marketplace.json` at the repo root):
 
 ```bash
-/plugin marketplace add akasecurity/ai-tc
-/plugin install akasecurity@ai-tc
+/plugin marketplace add akasecurity/marketplace
+/plugin install ai-tc@akasecurity
 ```
 
 Run these in the Claude Code **terminal CLI** (`claude`) — `/plugin` marketplace management is not exposed in the IDE/editor extension surfaces. Running Claude Desktop instead? See [Claude Desktop → Installing](claude-desktop.md#installing) for the equivalent Settings-panel flow.
