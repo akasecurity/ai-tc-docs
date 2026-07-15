@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{#
+  Site-wide social share banner. Points at the same card the marketing site uses
+  (akasecurity.io/open-source/) so a shared docs link previews identically.
+#}
+{% block extrahead %}
+  {{ super() }}
+
+  <meta property="og:image" content="https://akasecurity.io/og-default.png">
+  <meta property="og:image:secure_url" content="https://akasecurity.io/og-default.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="AKA Security social preview card">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://akasecurity.io/og-default.png">
+  <meta name="twitter:image:alt" content="AKA Security social preview card">
+{% endblock %}
