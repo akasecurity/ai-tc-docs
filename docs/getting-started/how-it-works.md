@@ -58,6 +58,13 @@ before the content reaches the model (prompts, tool inputs) or after it responds
   </div>
 </div>
 
+!!! note "One outbound path, and it's opt-in"
+    Everything above runs on your machine with no network hop — no account, no AKA
+    backend, nothing sent to a service we run. The single exception is the `/aka:setup`
+    triage, which, only with your explicit consent, sends the findings it detected to the
+    model API to be rated. See [Why the setup scan sends findings to the
+    model](installation.md#why-the-setup-scan-sends-findings-to-the-model).
+
 ## How rules are applied
 
 Every event is scanned against your installed rule packs. 
