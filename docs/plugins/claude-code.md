@@ -170,21 +170,42 @@ For the full graphical view, `/aka:dashboard` launches the OSS web-ui (the same 
 
 ## Configuration
 
-`/aka:setup` is a three-step onboarding wizard that records local preferences to `~/.aka/settings/settings.json` (created `0600`, owner-only) via `scripts/onboard.js`:
+`/aka:setup` is a calibration wizard that records local preferences to `~/.aka/settings/settings.json` (created `0600`, owner-only) via `scripts/onboard.js`. It derives everything it shows from your real activity — never a demo number — and writes nothing to the policy store until you confirm:
 
 ```json
 {
-  "specVersion": 2,
+  "specVersion": 5,
+  "runMode": "standalone",
   "policy": "redact",
   "historicalAccess": "session-only",
-  "onboardedAt": "2026-06-18T..."
+  "dataSharesInPlace": true,
+  "vaultKeyCustody": "file",
+  "vaultInlineReveal": "masked",
+  "onboardedAt": "2026-07-29T...",
+  "modelJudgeConsent": {
+    "acknowledgedAt": "2026-07-29T...",
+    "payloadVersion": 1
+  }
 }
 ```
 
 - **`policy`** — `redact` (replace sensitive values in place where the host allows) or `warn` (surface a warning, never modify content).
 - **`historicalAccess`** — `session-only` (default) or `full`. Consent for scanning pre-install surfaces — scratch/temp files, agent memory and prior conversation transcripts — for already-leaked secrets. Defaults to `session-only` so historical scanning is always an explicit opt-in, never an assumed grant on upgrade; declining still leaves AKA the working tree, the live session, git history and pointed scans to review.
+- **`dataSharesInPlace`** — in-place egress extraction on the scan paths; set `false` to stop all Data Shares writes.
+- **`modelJudgeConsent`** — **absent until granted.** Records that you consented to the `/aka:setup` triage sending findings to the model API to be rated, and the payload shape you agreed to. A consent recorded against an older `payloadVersion` is **stale, and stale reads as revoked** — you are asked again rather than silently held to a grant for a payload you never saw. This is a **distinct** consent from `historicalAccess`, which only governs *reading* local transcripts. Revocable under **Settings → Model-judge consent**; revoking stops future scans but cannot recall data already sent. See [Why the setup scan sends findings to the model](../getting-started/installation.md#why-the-setup-scan-sends-findings-to-the-model).
+- **`vaultConsent`** — **absent until granted.** Consent to keep a *recoverable* encrypted copy of detected values in the local secret vault instead of destroying them. Never an assumed grant on upgrade, because it is a custody change from one-way redaction. Revoking stops future vaulting; it does not erase what is already stored — purging the vault is the eraser.
+- **`vaultKeyCustody`** — where the vault master key lives (`file` default, or `keychain`).
+- **`vaultInlineReveal`** — how a vault pointer renders in assistant prose: `masked` (default — a `[scrubbed:…]` badge built from descriptor data only, with no de-reference and no audit row), `full` (the real value plus the badge, capped per message), or `off` (display untouched). `masked` is the default because injected content can induce the model to echo every pointer it has seen; under `full` those echoes would render real secrets on screen.
 
-The settings file is **versioned** (`specVersion`): each onboarding step is one more optional field, and an older `settings.json` still parses with the missing key taking its default — so a file written before `historicalAccess` existed loads as `session-only`.
+The settings file is **versioned** (`specVersion`): each onboarding step is one more optional field, and an older `settings.json` still parses with the missing key taking its default — so a file written before `historicalAccess` existed loads as `session-only`. v2 added `historicalAccess`, v3 `dataSharesInPlace`, v4 `modelJudgeConsent`, v5 the secret-vault fields.
+
+### The model-judge egress
+
+The false-positive/severity judgment that calibrates your posture needs the raw, unmasked findings to rate them accurately, so — **only** on the `modelJudgeConsent` grant above — it sends them to the model API through separate `claude -p` subprocesses (a large history is judged in several batches). Two things cross per finding: its **raw value**, and roughly **120 characters of surrounding transcript text** on either side, with any *other* detectable secret in that window re-masked first. The `filePath`, the value's fingerprint, and its key version are **dropped before egress**.
+
+Those subprocesses ask the `claude` CLI to write no transcript (`CLAUDE_CODE_SKIP_PROMPT_HISTORY=1`), so the raw values never enter your conversation or your scannable history — but that is *transcript* isolation, **not** *network* isolation. A copy of each value leaves the machine, because reaching the model is the whole point. The wizard acts only on the raw-free plan the subprocesses print back.
+
+Declining leaves AKA on the conservative severity floor (high-impact categories at `warn`, observe-only at `monitor`), which it then tunes from live activity. Full rationale and the revocation limits are on [the installation page](../getting-started/installation.md#why-the-setup-scan-sends-findings-to-the-model).
 
 ### Historical backfill scan
 
