@@ -12,28 +12,56 @@ findings.
 
 What you get:
 
-- `aka init` — set up your local AKA home
-- `aka scan` — scan files/directories for secrets & sensitive data
-- `aka stats` — print findings/enforcement aggregates
-- `aka detections` — list installed detection packs + apply updates (manual)
-- `aka dashboard` — open the local web dashboard
-- `aka tui` — an interactive terminal dashboard
-- `aka plugins` — install/manage agent plugins (Claude Code, …)
-- `aka check-updates` — see whether the CLI or your plugins have updates
-- `aka update` — update the CLI and/or plugins to the latest version
-- `aka attach` — (scaffold) point a standalone setup at an enterprise platform
+- `aka init` — scaffold your local AKA home (settings + local database)
+- `aka scan [path]` — scan a file or directory and record findings (default: `.`)
+- `aka stats` — print findings / enforcement / detections from the local store
+- `aka detections [update]` — list installed detection packs + apply updates (manual)
+- `aka plugins` — list / install agent plugins (Claude Code, …)
+- `aka dashboard` — launch the local web dashboard and open it in your browser
+- `aka exception` — manage detection exceptions (`approve`, `add`, `list`, `show`, `revoke`, `rotate-key`)
+- `aka vault [show]` — reveal a vaulted secret by its pointer (every reveal is audited)
+- `aka tui [view]` — interactive terminal dashboard (`health`, `findings`, `recommend`, `audit`)
+- `aka check-updates` — show which components (CLI + plugins) have updates available
+- `aka update [what]` — update the CLI and/or plugins (`cli`, `<plugin-id>`, `all`)
+- `aka completion <zsh|bash>` — emit a shell completion script
 - `aka --version` — print the installed CLI version
+
+Global flags, honored for every command:
+
+- `--home <dir>` — use an alternate AKA home (default: `~/.aka`)
+- `--no-update-check` — skip the post-command "updates available" notice
 
 ---
 
-## Prerequisites
+## Install
 
-- **Node.js 26** — the CLI uses the built-in `node:sqlite` (no native dependency), and
-  the repo pins `engines: 26.x`. Install from [nodejs.org](https://nodejs.org) or a
-  version manager (`fnm`, `nvm`, `volta`). Check with `node --version`.
-- **A GitHub token with `read:packages`** — **only while AKA is pre-release.** The CLI
-  is published to **private GitHub Packages** during stealth, so installing it needs
-  authentication. This requirement goes away when the project is public. See
+The `aka` CLI ships as a **self-contained binary** that embeds its own Node runtime — no
+Node.js, no npm, no native dependencies:
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/akasecurity/ai-tc/bin-latest/tools/installer/install.sh | sh
+
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/akasecurity/ai-tc/bin-latest/tools/installer/install.ps1 | iex
+```
+
+The one-liner pins to the latest published binary release tag (`bin-latest`, never `main`)
+and verifies the download against that release's `SHA256SUMS` — **fail-closed**, so a
+corrupted or tampered download is refused rather than installed. To pin an exact version
+instead, set `AKA_INSTALL_REF=bin-v<version>` before running the line.
+
+### Prerequisites
+
+- **Binary install:** none.
+- **npm install (`@akasecurity/cli`):** **Node.js 24+** — the CLI uses the built-in
+  `node:sqlite` (no native dependency), and the repo tracks the Active LTS line. Install
+  from [nodejs.org](https://nodejs.org) or a version manager (`fnm`, `nvm`, `volta`).
+  Check with `node --version`.
+- **A GitHub token with `read:packages`** — **only while AKA is pre-release**, and only
+  for the npm path. The package is published to **private GitHub Packages** during
+  stealth, so installing it needs authentication. This requirement goes away when the
+  project is public. See
   [Authenticating to GitHub Packages](../plugins/claude-code.md#distribution-marketplace-npm).
 
 ---
@@ -123,8 +151,68 @@ aka dashboard --no-open     # start the server without opening a browser
 Prefer the terminal? Use the interactive Ink dashboard instead:
 
 ```bash
-aka tui
+aka tui              # pick a view interactively
+aka tui health       # jump straight to one
 ```
+
+`aka tui` opens on the view you name — `health`, `findings`, `recommend`, or `audit`
+(the same four surfaces as the `/aka:*` slash commands). It needs a TTY, so it won't
+run under a pipe or in CI.
+
+## Manage exceptions
+
+An exception is a deliberate, audited carve-out that lets one specific value through a
+rule that would otherwise catch it. Granting one is only available out-of-band from the
+CLI — never from inside an agent session, so a compromised session can't grant itself a
+bypass.
+
+```bash
+aka exception list                  # active grants
+aka exception list --all            # + expired, consumed, and revoked (audit evidence)
+aka exception show 3f2a91           # full detail (an unambiguous id prefix is enough)
+aka exception revoke 3f2a91 --reason "no longer needed"
+```
+
+Every grant needs a scope — exactly one of `--once`, `--for <30m|1h|24h>`, or
+`--permanent` — plus a `--reason` (you're prompted for it on a terminal if you omit it).
+
+```bash
+# Approve something blocked in the last 30 minutes, by the reference in the block message
+aka exception approve 3f2a --for 1h --reason "temp deploy creds"
+
+# Pre-authorize a value that wasn't just blocked
+aka exception add --rule secrets/aws-access-key --stdin --once --reason "rotating today" < key.txt
+```
+
+!!! warning "The value is never an argument"
+    `aka exception add` will **not** accept the secret on the command line — pipe it with
+    `--stdin` or type it at the hidden prompt. `aka exception approve` does accept a
+    pasted value (matched by keyed fingerprint, never stored or echoed), but it lands in
+    your shell history — so prefer the reference where that matters.
+
+Nothing is ever deleted: revoked, expired, and consumed grants are kept as audit
+evidence. `aka exception rotate-key` mints a new fingerprint key, and **rotation is
+invalidation** — every existing grant stops matching, because fingerprints can't be
+re-keyed (raw values are never stored). Active permanent grants are listed so you can
+re-approve them deliberately.
+
+## Reveal a vaulted secret
+
+When the secret vault is enabled, a detected value can be replaced by an `[[aka:…]]`
+**pointer** instead of being destroyed — reversible tokenization rather than one-way
+redaction. `aka vault show` resolves a pointer back to its raw value:
+
+```bash
+aka vault show '[[aka:...]]'
+```
+
+Quote the pointer — the double brackets are shell syntax otherwise. Every successful
+reveal writes an audit row to the local store, so de-referencing is never silent.
+
+A pointer that resolves to nothing reports one deliberately indistinguishable failure:
+it may be forged or tampered, its entry may have been purged, or the vault key material
+may be unavailable. The vault doesn't say which — a token nobody can vouch for resolves
+to nothing.
 
 ## Install agent plugins
 
