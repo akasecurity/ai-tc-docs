@@ -81,6 +81,7 @@ flowchart TD
     end
 
     subgraph runtime["Shared runtime"]
+        pluginRuntime["packages/plugin-runtime<br/><small>Hook wiring the plugin runs on</small>"]
         sdk["packages/plugin-sdk<br/><small>Adapter interface + runtime lifecycle</small>"]
         detections["packages/detections<br/><small>Pure detection engine — scan + redact</small>"]
         persistence["packages/persistence<br/><small>Local SQLite store adapter</small>"]
@@ -89,7 +90,11 @@ flowchart TD
 
     rules["rules/<br/><small>Detection rule packs</small>"]
 
+    plugin --> pluginRuntime
     plugin --> sdk
+    pluginRuntime --> sdk
+    pluginRuntime --> persistence
+    pluginRuntime --> schema
     sdk --> detections
     sdk --> persistence
     cli --> persistence
@@ -101,8 +106,9 @@ flowchart TD
 ```
 
 `apps/cli` and `apps/web-ui` read/write `packages/persistence` directly; only
-the harness plugin goes through `packages/plugin-sdk`, since that's the layer
-that also owns the hook lifecycle. `packages/detections` is pure (no I/O), so the same scan/redact logic runs
+the harness plugin goes through `packages/plugin-runtime` and
+`packages/plugin-sdk`, since that's the layer that also owns the hook lifecycle.
+`packages/detections` is pure (no I/O), so the same scan/redact logic runs
 identically whether it's invoked from the plugin or the enterprise backend.
 `packages/plugin-sdk` is what lets a new harness adapter reuse the same runtime
 instead of reimplementing storage/detection — see [Data Flow](data-flow.md) for
