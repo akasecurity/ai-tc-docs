@@ -4,7 +4,7 @@ comments: true
 
 # Uninstalling the Plugin
 
-Claude Code and Claude Desktop run the **same plugin package** (`apps/plugin-claude-code`), so uninstalling looks almost identical on both — remove the plugin through the host's own plugin manager, then restart. This page covers both flows and, more importantly, what uninstalling **does and doesn't** clean up.
+Claude Code and Claude Desktop run the **same plugin package** (`plugins/claude-code`), so uninstalling looks almost identical on both — remove the plugin through the host's own plugin manager, then restart. This page covers both flows and, more importantly, what uninstalling **does and doesn't** clean up.
 
 ## Claude Code (CLI)
 

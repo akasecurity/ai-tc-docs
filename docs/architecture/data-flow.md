@@ -41,7 +41,7 @@ contract.
 
 ## Dashboard
 
-The OSS **web-ui** (`apps/web-ui`, Next.js) reads the local SQLite store directly
+The OSS **web-ui** (`web-ui`, Next.js) reads the local SQLite store directly
 through `@akasecurity/persistence` — no backend, no HTTP. It shares its view
 components with the enterprise dashboard, so the same Findings, Detections, Data
 Shares, and Inventory pages work identically over local data. Launch it with
