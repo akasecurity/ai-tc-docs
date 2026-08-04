@@ -48,7 +48,7 @@ ai-tc/
 
 ## Build & distribution
 
-`apps/plugin-claude-code` and `apps/cli` are built with `tsup`, which inlines every
+`plugins/claude-code` and `cli` are built with `tsup`, which inlines every
 `@akasecurity/*` workspace dependency (`noExternal: [/^@akasecurity\//]`) — the published
 package ships with **no runtime `node_modules`** of its own. Only Node itself needs to
 be on the user's `PATH`, since the hooks invoke it directly. The CLI additionally
