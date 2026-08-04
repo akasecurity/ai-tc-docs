@@ -27,8 +27,8 @@ policies.
 ### 3. Load the plugin for a session
 
 ```bash
-pnpm turbo run build --filter=@akasecurity/plugin-claude-code
-claude --plugin-dir ./apps/plugin-claude-code
+pnpm turbo run build --filter=@akasecurity/ai-tc-claude-code
+claude --plugin-dir ./plugins/claude-code
 ```
 
 ### 4. Test the plugin hook
@@ -38,7 +38,7 @@ same shape a real secrets rule would match — to verify it works:
 
 ```bash
 echo '{"prompt":"here is a test credential: see rules/secrets fixtures for the exact shape"}' \
-  | node apps/plugin-claude-code/scripts/user-prompt-submit.js
+  | node plugins/claude-code/scripts/user-prompt-submit.js
 # → {"decision":"block","reason":"AKA blocked this prompt — flagged secrets/aws-access-key ..."}
 ```
 

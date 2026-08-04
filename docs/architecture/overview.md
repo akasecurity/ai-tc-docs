@@ -75,9 +75,9 @@ underneath them:
 ```mermaid
 flowchart TD
     subgraph adapters["Harness adapters"]
-        plugin["apps/plugin-claude-code<br/><small>Hooks for Claude Code / Claude Desktop</small>"]
-        cli["apps/cli<br/><small>The aka CLI</small>"]
-        webui["apps/web-ui<br/><small>OSS Next.js dashboard</small>"]
+        plugin["plugins/claude-code<br/><small>Hooks for Claude Code / Claude Desktop</small>"]
+        cli["cli<br/><small>The aka CLI</small>"]
+        webui["web-ui<br/><small>OSS Next.js dashboard</small>"]
     end
 
     subgraph runtime["Shared runtime"]
@@ -105,7 +105,7 @@ flowchart TD
     sdk --> schema
 ```
 
-`apps/cli` and `apps/web-ui` read/write `packages/persistence` directly; only
+`cli` and `web-ui` read/write `packages/persistence` directly; only
 the harness plugin goes through `packages/plugin-runtime` and
 `packages/plugin-sdk`, since that's the layer that also owns the hook lifecycle.
 `packages/detections` is pure (no I/O), so the same scan/redact logic runs
