@@ -5,7 +5,7 @@ comments: true
 # Claude Desktop Plugin
 
 !!! note
-    Claude Desktop runs the **same plugin package** as Claude Code — `apps/plugin-claude-code`, identical hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`), the same fail-open guarantee, the same local SQLite store (`~/.aka/data/aka.db`), and the same `/aka:*` commands. 
+    Claude Desktop runs the **same plugin package** as Claude Code — `plugins/claude-code`, identical hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`), the same fail-open guarantee, the same local SQLite store (`~/.aka/data/aka.db`), and the same `/aka:*` commands. 
     
     See the [Claude Code plugin guide](claude-code.md) for the full architecture, hook contract, and command reference — this page only covers what's different about running it inside Desktop.
 
