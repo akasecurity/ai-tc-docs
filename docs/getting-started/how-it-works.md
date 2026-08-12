@@ -103,4 +103,4 @@ Sometimes a blocked or redacted value is legitimate such as a sandbox credential
 | **Rule**      | A JSON file describing what to detect: keyword list, regex pattern, or validator |
 | **Rule Pack** | A directory of rules + mandatory fixtures with a `manifest.json` |
 | **Policy**    | A decision: what action to take when a rule or category fires |
-| **Plugin**    | The harness extension (hooks) that intercepts sessions — one package, used by both Claude Code and Claude Desktop |
+| **Plugin**    | The harness extension (hooks) that intercepts sessions — one package per host (Claude Code/Desktop share one; Codex, Antigravity, and the browser extension have their own), all writing the same local store |
