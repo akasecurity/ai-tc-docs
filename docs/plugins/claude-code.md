@@ -4,7 +4,7 @@ comments: true
 
 # Claude Code Plugin
 
-The Claude Code plugin (`apps/plugin-claude-code`) hooks into Claude Code sessions using the official plugin + hook system. It scans prompts and tool calls locally and enforces warn/redact/block policies inline — writing findings to a local SQLite store by default, with zero backend required.
+The Claude Code plugin (`plugins/claude-code`) hooks into Claude Code sessions using the official plugin + hook system. It scans prompts and tool calls locally and enforces warn/redact/block policies inline — writing findings to a local SQLite store by default, with zero backend required.
 
 !!! note 
     **Same plugin, two interfaces.** This is the same package that runs inside Claude Desktop — identical hooks, detection engine, and `/aka:*` commands. 
@@ -16,7 +16,7 @@ The Claude Code plugin (`apps/plugin-claude-code`) hooks into Claude Code sessio
 A Claude Code plugin is a directory that Claude Code loads at startup. AKA's layout:
 
 ```text
-apps/plugin-claude-code/
+plugins/claude-code/
 ├── .claude-plugin/
 │   └── plugin.json      # manifest — ONLY this file goes in .claude-plugin/
 ├── hooks/hooks.json     # hook → script wiring (auto-discovered)
@@ -39,9 +39,10 @@ The manifest is intentionally minimal. `name` becomes the command namespace, so 
 ```json
 {
   "name": "aka",
-  "version": "0.0.1",
-  "description": "AKA AI-TC — inspect and govern AI prompts in Claude Code",
-  "author": { "name": "AKA" }
+  "version": "0.9.5",
+  "description": "AI Traffic Control — inspect and govern AI prompts in Claude Code. Detection runs locally; events are recorded to a local SQLite store on your machine.",
+  "homepage": "https://github.com/akasecurity/ai-tc",
+  "author": { "name": "AKA Security" }
 }
 ```
 
@@ -51,7 +52,7 @@ The manifest is intentionally minimal. `name` becomes the command namespace, so 
     
     Claude Code auto-discovers `hooks/hooks.json` and `commands/`; manifest keys are only for **non-default** paths, and their formats are strict — `commands` must be a `./`-prefixed array (`["./custom/cmds/"]`) and `hooks` a `./`-prefixed string (`"./config/hooks.json"`). 
     
-    The malformed `"hooks": "hooks/hooks.json"` / `"commands": "commands/"` fails manifest validation. Check with `claude plugin validate apps/plugin-claude-code`.
+    The malformed `"hooks": "hooks/hooks.json"` / `"commands": "commands/"` fails manifest validation. Check with `claude plugin validate plugins/claude-code`.
 
 ## Architecture in one paragraph
 
@@ -65,8 +66,10 @@ Declared in `hooks/hooks.json` (note: `timeout` is in **seconds**, and commands 
 | ------------------ | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SessionStart`     | all sessions           | resolve this machine's inventory (host/harness/account/project), upsert it, and open the session's audit-event root (once per session; emits nothing) |
 | `UserPromptSubmit` | all prompts            | block or warn (Claude Code cannot rewrite prompt text — no redaction)                                                                                 |
-| `PreToolUse`       | `Bash\|Edit\|Write`    | deny, **redact via `updatedInput`**, or warn                                                                                                          |
+| `PreToolUse`       | `Bash\|Edit\|Write\|WebFetch\|MultiEdit\|NotebookEdit\|Task\|mcp__.*` | deny, **redact via `updatedInput`**, or warn                                        |
 | `PostToolUse`      | `Bash\|Read\|WebFetch` | replace sensitive output via `updatedToolOutput`, or warn                                                                                             |
+| `MessageDisplay`   | every streaming delta  | display-only rewrite of vault pointers via `displayContent` — the transcript and the model's context keep the original text                            |
+| `Stop`             | end of turn            | trigger the background token-usage reconcile worker (spawned detached, so it adds no latency)                                                          |
 
 ## Hook output contract (Claude Code's, not ours)
 
@@ -115,7 +118,7 @@ Exit code semantics: exit `0` and Claude Code parses stdout JSON; no output mean
 The hooks cannot do everything the warn/redact/block model might imply:
 
 - **Prompt text cannot be rewritten.** `UserPromptSubmit` can only block or warn, so a `redact` policy on the prompt surface degrades to a warning — the content still reaches the model. True redaction works only on tool inputs (`updatedInput`) and outputs (`updatedToolOutput`).
-- **Responses are not intercepted inline.** No hook sees the model's reply before the user does. Response capture is post-hoc via the `Stop` hook's transcript (not yet implemented).
+- **Responses are not intercepted inline.** No hook sees the model's reply before the user does. Response capture is **post-hoc**: the `Stop` hook triggers a detached reconcile worker that reads only the transcript bytes appended since the last pass, records findings and token usage from them, and scrubs secret spans in the on-disk transcript in place (Claude Code appends a prompt to `~/.claude/projects/*.jsonl` even when a hook blocked it). `MessageDisplay` can rewrite what the terminal *renders*, but not what the model already produced.
 - **Inline prompt redaction and response interception** are on the roadmap for the future; the plugin is the zero-config developer-experience layer, not the enforcement guarantee.
 
 ## Read surface (slash commands)
@@ -153,7 +156,7 @@ The masked preview reveals only the first and last character of the detected val
 The raw matched secret is **never** stored or shown — only a masked form. All are read-only; they never mutate the database. They also work directly:
 
 ```bash
-node apps/plugin-claude-code/scripts/query.js findings
+node plugins/claude-code/scripts/query.js findings
 ```
 
 `/aka:scan` re-runs are cheap: every scanned file — including clean ones — is tracked in a local scan ledger (path + mtime + content hash), so an unchanged file is skipped without even being re-read. The ledger is keyed to a fingerprint of the active detection ruleset, so installing or updating a rule pack automatically rescans everything; findings themselves are deduplicated by content hash, so a re-run never duplicates them.
@@ -245,8 +248,8 @@ Hooks invoke `node` at runtime, so `node` must be on the user's PATH — note th
 Load the plugin for a single session without a marketplace install:
 
 ```bash
-pnpm turbo run build --filter=@akasecurity/plugin-claude-code   # tsup bundles src → scripts/*.js (self-contained)
-claude --plugin-dir ./apps/plugin-claude-code           # load for one session
+pnpm turbo run build --filter=@akasecurity/ai-tc-claude-code   # tsup bundles src → scripts/*.js (self-contained)
+claude --plugin-dir ./plugins/claude-code           # load for one session
 # after a rebuild, run /reload-plugins inside the session
 ```
 
@@ -286,7 +289,7 @@ Why npm rather than a git source: a Claude Code marketplace install **copies the
 
 Releasing is automated by [`.github/workflows/release-plugin.yml`](https://github.com/akasecurity/ai-tc/blob/main/.github/workflows/release-plugin.yml):
 
-1. Bump `version` in both `apps/plugin-claude-code/package.json` and `.claude-plugin/plugin.json`.
+1. Bump `version` in both `plugins/claude-code/package.json` and `.claude-plugin/plugin.json`.
 2. Push a tag `plugin-v<version>` (e.g. `plugin-v0.1.0`).
 3. CI builds with Turbo, verifies the tag matches both manifests, smoke-tests the fail-open contract, publishes to **private GitHub Packages** (`npm.pkg.github.com`, authenticated with the workflow's built-in `GITHUB_TOKEN`), and attaches the tarball to a GitHub Release.
 
@@ -295,10 +298,10 @@ The marketplace's npm source is unpinned, so `/plugin install` and `/plugin upda
 Hooks are also testable without Claude Code:
 
 ```bash
-echo '{"prompt":"key AKIAIOSFODNN7EXAMPLE"}' | node apps/plugin-claude-code/scripts/user-prompt-submit.js
+echo '{"prompt":"key AKIAIOSFODNN7EXAMPLE"}' | node plugins/claude-code/scripts/user-prompt-submit.js
 # → {"decision":"block","reason":"AKA blocked this prompt — flagged secrets/aws-access-key (A******E). Remove the flagged content and resubmit.\n..."}
 
-echo 'not json' | node apps/plugin-claude-code/scripts/user-prompt-submit.js
+echo 'not json' | node plugins/claude-code/scripts/user-prompt-submit.js
 # → no output, exit 0 (fail-open)
 ```
 
@@ -312,4 +315,12 @@ Three layers, all of which must hold:
 
 ## Building a new adapter
 
-To support a different AI tool (Cursor, Continue, etc.), implement the `AkaPluginAdapter` interface from `packages/plugin-sdk` and reuse the same runtime: `createPluginRuntime` (local scan + policy), `buildIngestEvent`, `registerRulePack`, and `syncWithBackend` (out-of-band network). See `packages/plugin-sdk/src/types.ts` for the full interface.
+To support a different AI tool, implement the `AkaPluginAdapter` interface from `packages/plugin-sdk` and reuse the same runtime: `createPluginRuntime` (local scan + policy), `buildIngestEvent`, `registerRulePack`, and `syncWithBackend` (out-of-band network). See `packages/plugin-sdk/src/types.ts` for the full interface.
+
+Three adapters already exist alongside this one, and they are the most useful reference for what varies between hosts — event names, what a hook's output can express, and therefore which policies degrade:
+
+- [Codex CLI](codex.md) — same event names, but no output splicing and no `apply_patch` events yet
+- [Antigravity](antigravity.md) — no prompt event at all, fail-closed hooks, deny-instead-of-redact
+- [Browser extension](browser-extension.md) — no hook system; a content script plus a local native-messaging host
+
+Adding a host is a registry entry (`AGENT_PLUGINS` in `packages/local-ops/src/registry.ts`, which joins the agent to the rows it records via its `sourceTool`) plus a thin plugin package — not a change to the CLI or the runtime.

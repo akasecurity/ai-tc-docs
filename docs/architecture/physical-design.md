@@ -2,15 +2,18 @@
 
 ## Repository layout
 
-The open-source surface consists of the plugin, the CLI, the local SQLite store, and
+The open-source surface consists of the harness plugins, the CLI, the local SQLite store, and
 the OSS web-ui. AKA also has a separate enterprise control plane for teams.
 
 ```
 ai-tc/
-├── apps/
-│   ├── plugin-claude-code/  Hooks for Claude Code and Claude Desktop
-│   ├── cli/                 The `aka` CLI — scan, stats, dashboard, plugin management
-│   └── web-ui/              OSS Next.js dashboard — reads the local store directly
+├── plugins/
+│   ├── claude-code/         Hooks for Claude Code and Claude Desktop
+│   ├── codex/               Hooks + skills for Codex CLI
+│   ├── antigravity/         Hooks + skills for the Antigravity (`agy`) CLI
+│   └── browser-extension/   Chrome MV3 extension + native host for ChatGPT / Claude.ai
+├── cli/                     The `aka` CLI — scan, stats, dashboard, plugin management
+├── web-ui/                  OSS Next.js dashboard — reads the local store directly
 ├── packages/
 │   ├── schema/           Zod contracts — single source of truth
 │   ├── config/           Env loader — sole reader of process.env
@@ -48,7 +51,7 @@ ai-tc/
 
 ## Build & distribution
 
-`apps/plugin-claude-code` and `apps/cli` are built with `tsup`, which inlines every
+`plugins/claude-code` and `cli` are built with `tsup`, which inlines every
 `@akasecurity/*` workspace dependency (`noExternal: [/^@akasecurity\//]`) — the published
 package ships with **no runtime `node_modules`** of its own. Only Node itself needs to
 be on the user's `PATH`, since the hooks invoke it directly. The CLI additionally
