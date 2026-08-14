@@ -30,6 +30,50 @@ comments: true
 
     See the [Claude Desktop plugin guide](../plugins/claude-desktop.md) for the full walkthrough.
 
+=== "Codex CLI"
+
+    Codex resolves the plugin from this repo's own marketplace file:
+
+    ```bash
+    codex plugin marketplace add akasecurity/ai-tc
+    codex plugin install aka-codex@ai-tc
+    ```
+
+    Restart Codex afterwards. See the [Codex plugin guide](../plugins/codex.md) for the hook
+    contract and the skill-based read surface.
+
+=== "Antigravity"
+
+    Antigravity has no plugin marketplace — `agy plugin install` takes a local directory:
+
+    ```bash
+    npm pack @akasecurity/ai-tc-antigravity
+    tar -xzf akasecurity-ai-tc-antigravity-*.tgz
+    agy plugin install ./package
+    aka init
+    ```
+
+    Hooks fire in the `agy` **CLI** only, and this host cannot block or redact prompts — read
+    [Known limitations](../plugins/antigravity.md#known-limitations) before relying on it for
+    enforcement.
+
+=== "Browser (ChatGPT / Claude.ai)"
+
+    Web chat is covered by a Chrome extension plus a local native-messaging host:
+
+    ```bash
+    aka extension install
+    ```
+
+    Then load the built extension via **Load unpacked** at `chrome://extensions` (the command
+    prints the path). See the [browser extension guide](../plugins/browser-extension.md).
+
+!!! tip "Already have the `aka` CLI?"
+    `aka plugins list` shows every supported agent and whether it's installed, and
+    `aka plugins install <agent>` (`claude-code`, `codex`, `antigravity`) runs the host's own
+    plugin manager for you. Every plugin writes the same local store, so mixing agents just means
+    more of your activity lands in one findings history.
+
 !!! note "Coming soon"
     **Homebrew** and **npm** installation options are coming soon.
 
@@ -40,6 +84,9 @@ Inside a session, run the onboarding wizard:
 ```
 /aka:setup
 ```
+
+On Codex and Antigravity there is no `/aka:*` command namespace — the same wizard ships as the
+**`aka-setup` skill**; ask for it by name in the session.
 
 The wizard calibrates AKA from your *actual* activity rather than a demo profile: it
 offers one retroactive scan of the last 30 days of Claude history, reports the real
@@ -128,4 +175,6 @@ Navigate to `http://localhost:4319/security` to see the Events page.
 
 - Review the findings inside your harness with [`/aka:findings`](usage.md#akafindings)
 - Use [the `aka` CLI](cli.md) for scanning, stats, and managing detection packs
-- [Claude Code plugin guide](../plugins/claude-code.md) or [Claude Desktop plugin guide](../plugins/claude-desktop.md) for hook internals and configuration details
+- Per-host hook internals and configuration details: [Claude Code](../plugins/claude-code.md),
+  [Claude Desktop](../plugins/claude-desktop.md), [Codex CLI](../plugins/codex.md),
+  [Antigravity](../plugins/antigravity.md), [browser extension](../plugins/browser-extension.md)

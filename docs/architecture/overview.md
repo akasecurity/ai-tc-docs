@@ -75,9 +75,12 @@ underneath them:
 ```mermaid
 flowchart TD
     subgraph adapters["Harness adapters"]
-        plugin["apps/plugin-claude-code<br/><small>Hooks for Claude Code / Claude Desktop</small>"]
-        cli["apps/cli<br/><small>The aka CLI</small>"]
-        webui["apps/web-ui<br/><small>OSS Next.js dashboard</small>"]
+        plugin["plugins/claude-code<br/><small>Hooks for Claude Code / Claude Desktop</small>"]
+        codex["plugins/codex<br/><small>Hooks + skills for Codex CLI</small>"]
+        antigravity["plugins/antigravity<br/><small>Hooks + skills for the agy CLI</small>"]
+        browser["plugins/browser-extension<br/><small>Chrome MV3 + native host — ChatGPT / Claude.ai</small>"]
+        cli["cli<br/><small>The aka CLI</small>"]
+        webui["web-ui<br/><small>OSS Next.js dashboard</small>"]
     end
 
     subgraph runtime["Shared runtime"]
@@ -92,6 +95,11 @@ flowchart TD
 
     plugin --> pluginRuntime
     plugin --> sdk
+    codex --> pluginRuntime
+    codex --> sdk
+    antigravity --> pluginRuntime
+    antigravity --> sdk
+    browser --> sdk
     pluginRuntime --> sdk
     pluginRuntime --> persistence
     pluginRuntime --> schema
@@ -105,9 +113,11 @@ flowchart TD
     sdk --> schema
 ```
 
-`apps/cli` and `apps/web-ui` read/write `packages/persistence` directly; only
-the harness plugin goes through `packages/plugin-runtime` and
-`packages/plugin-sdk`, since that's the layer that also owns the hook lifecycle.
+`cli` and `web-ui` read/write `packages/persistence` directly; the harness plugins go through
+`packages/plugin-runtime` and `packages/plugin-sdk`, since that's the layer that also owns the
+hook lifecycle. That's what makes a new harness an adapter rather than a fork: Claude Code,
+Codex, Antigravity, and the browser extension differ only in how their host delivers events and
+what its hook output can express.
 `packages/detections` is pure (no I/O), so the same scan/redact logic runs
 identically whether it's invoked from the plugin or the enterprise backend.
 `packages/plugin-sdk` is what lets a new harness adapter reuse the same runtime

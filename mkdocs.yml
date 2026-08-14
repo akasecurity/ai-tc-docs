@@ -107,6 +107,9 @@ nav:
   - Plugin Guide:
       - Claude Code: plugins/claude-code.md
       - Claude Desktop: plugins/claude-desktop.md
+      - Codex CLI: plugins/codex.md
+      - Antigravity: plugins/antigravity.md
+      - Browser Extension: plugins/browser-extension.md
       - Uninstalling: plugins/uninstalling.md
   - Detections:
       - Built-in Detections: rules/built-in.md

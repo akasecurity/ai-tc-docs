@@ -4,7 +4,10 @@ comments: true
 
 # Uninstalling the Plugin
 
-Claude Code and Claude Desktop run the **same plugin package** (`apps/plugin-claude-code`), so uninstalling looks almost identical on both — remove the plugin through the host's own plugin manager, then restart. This page covers both flows and, more importantly, what uninstalling **does and doesn't** clean up.
+Every AKA plugin is removed through its own host's plugin manager, followed by a restart. Claude
+Code and Claude Desktop run the **same plugin package** (`plugins/claude-code`), so those two
+flows are near-identical; Codex, Antigravity, and the browser extension each have their own. This
+page covers all of them and, more importantly, what uninstalling **does and doesn't** clean up.
 
 ## Claude Code (CLI)
 
@@ -19,10 +22,39 @@ claude plugin uninstall aka
 If you don't plan to reinstall, also remove the marketplace registration:
 
 ```bash
-claude plugin marketplace remove ai-tc
+claude plugin marketplace remove akasecurity
 ```
 
 This just forgets where to fetch the plugin from — it has no effect on anything already installed or on local AKA data.
+
+## Codex CLI
+
+```bash
+codex plugin uninstall aka-codex@ai-tc
+codex plugin marketplace remove ai-tc   # optional, if you won't reinstall
+```
+
+Restart Codex afterwards so the running session drops the hooks. The `aka-*` skills disappear with
+the plugin; `~/.aka` is untouched.
+
+## Antigravity
+
+Antigravity installed the plugin from a local directory, so remove it with `agy`'s own plugin
+manager and restart the CLI. The extracted `./package` directory you installed from is just a
+staging copy — deleting it after removal is safe (and deleting it *before* removal doesn't
+uninstall anything).
+
+## Browser extension
+
+Two halves to remove:
+
+1. Remove **AI Traffic Control** from `chrome://extensions`.
+2. Delete the native-messaging manifest and launcher from the directory `aka extension status`
+   reports. On Windows also remove the registry key
+   `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.akasecurity.aka`.
+
+Leaving the host installed with no extension is harmless — Chrome only spawns it for the pinned
+extension id — but it will keep answering if you reload the extension later.
 
 ## Claude Desktop
 
@@ -35,12 +67,12 @@ Desktop has no terminal, so removal happens in **Settings → Plugins**, mirrori
 
 ## What uninstalling does — and doesn't — remove
 
-Uninstalling unregisters the plugin from the host (Code or Desktop):
+Uninstalling unregisters the plugin from that one host:
 
-- The four hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`) stop firing — prompts and tool calls are no longer scanned, and nothing is warned, redacted, or blocked.
-- The `/aka:*` slash commands disappear.
+- Its hooks stop firing — prompts and tool calls are no longer scanned there, and nothing is warned, redacted, or blocked.
+- Its read surface disappears: the `/aka:*` slash commands on Claude Code/Desktop, the `aka-*` skills on Codex and Antigravity.
 
-It does **not** touch `~/.aka/` — the settings file, the local SQLite store (`~/.aka/data/aka.db`), the event queue, or the policy cache. That's intentional: Code and Desktop share the same store, and so does the `aka` CLI and dashboard, so uninstalling from one surface doesn't cut the others off from their findings history.
+It does **not** touch `~/.aka/` — the settings file, the local SQLite store (`~/.aka/data/aka.db`), the event queue, or the policy cache. That's intentional: every plugin shares that store, and so do the `aka` CLI and the dashboard, so uninstalling from one surface doesn't cut the others off from their findings history. It also doesn't disable the *other* hosts: findings from a still-installed Codex or Antigravity plugin keep arriving.
 
 !!! note
     `claude plugin uninstall`'s `--keep-data` flag refers to Claude Code's own per-plugin data directory (`~/.claude/plugins/data/{id}/`). AKA never writes there — all of its state lives under `~/.aka/` — so this flag has no effect on AKA's data either way.
@@ -54,7 +86,7 @@ rm -rf ~/.aka
 ```
 
 !!! warning
-    This is shared state: it wipes findings/settings for **both** Claude Code and Claude Desktop, and for the `aka` CLI/dashboard if you use them. Uninstall the plugin from every surface first, or the next session start will just recreate `~/.aka` and start populating it again.
+    This is shared state: it wipes findings/settings for **every** surface — Claude Code, Claude Desktop, Codex, Antigravity, the browser extension, and the `aka` CLI/dashboard. Uninstall the plugin from every surface first, or the next session start will just recreate `~/.aka` and start populating it again.
 
 ## Reinstalling later
 
