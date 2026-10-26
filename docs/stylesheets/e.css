@@ -1,0 +1,120 @@
+/* Direction E, "Cover art": the docs carry the cover's world. Coal header with lane-paint tabs,
+   a full-bleed coal hero band with the art, spot illustrations, road-paint callouts. Flat. */
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #232F3E;
+  --md-primary-fg-color--light: #2C3A4B;
+  --md-primary-fg-color--dark: #1B2531;
+  --md-primary-bg-color: #FFFFFF;
+  --md-primary-bg-color--light: rgba(255, 255, 255, 0.72);
+  --md-accent-fg-color: #0A7A67;
+  --md-accent-fg-color--transparent: rgba(0, 224, 184, 0.12);
+  --md-accent-bg-color: #FFFFFF;
+  --md-typeset-a-color: #0A7A67;
+  --md-default-fg-color: #232F3E;
+  --md-default-fg-color--light: #5A6C7E;
+  --md-typeset-color: #3D4E5E;
+  --md-code-bg-color: #F6F8F9;
+  --md-code-fg-color: #232F3E;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #232F3E;
+  --md-primary-fg-color--light: #2C3A4B;
+  --md-primary-fg-color--dark: #1B2531;
+  --md-primary-bg-color: #FFFFFF;
+  --md-default-bg-color: #1B2531;
+  --md-accent-fg-color: #00E0B8;
+  --md-typeset-a-color: #7DF8E2;
+}
+.md-header { border-bottom: 0; }
+.md-header__topic:first-child { font-family: "Hanken Grotesk", sans-serif; font-weight: 500; letter-spacing: -0.01em; }
+/* tabs read as painted lane names; the active one sits on a dashed lane line */
+.md-tabs { border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.md-tabs__item { position: relative; }
+.md-tabs__link { opacity: 1; color: rgba(255, 255, 255, 0.62); font-family: "Geist Mono", monospace; font-weight: 500; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.md-tabs__link:hover, .md-tabs__item--active .md-tabs__link { color: #FFFFFF; }
+.md-tabs__item--active::after { content: ""; position: absolute; left: 0.6rem; right: 0.6rem; bottom: 0; border-bottom: 3px dashed #00E0B8; }
+[data-md-color-scheme="default"] .md-search__input { background-color: rgba(255, 255, 255, 0.08); color: #FFFFFF; border-radius: 0.5rem; }
+[data-md-color-scheme="default"] .md-search__input::placeholder { color: rgba(255, 255, 255, 0.6); }
+[data-md-color-scheme="default"] .md-search__icon { color: rgba(255, 255, 255, 0.72); }
+.md-typeset h1 { font-weight: 300; color: var(--md-default-fg-color); letter-spacing: -0.03em; font-size: 2.2rem; }
+.md-typeset h2 { font-weight: 400; letter-spacing: -0.015em; padding-top: 0.4rem; border-top: 3px dashed #CBDBEF; }
+[data-md-color-scheme="slate"] .md-typeset h2 { border-top-color: #3D4E5E; }
+.md-typeset h3 { font-weight: 500; }
+.md-nav__item--section > .md-nav__link { font-family: "Geist Mono", monospace; font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600; }
+.md-nav__link--active, .md-nav__link--active code { color: var(--md-accent-fg-color) !important; font-weight: 600; }
+
+/* content tabs as lanes */
+.md-typeset .tabbed-labels { --md-accent-fg-color: #FFFFFF; --md-default-fg-color--light: rgba(255, 255, 255, 0.62); border-bottom: 0; background: #232F3E; border-radius: 12px 12px 0 0; padding: 0 0.4rem; box-shadow: none; }
+.md-typeset .tabbed-labels > label { font-family: "Geist Mono", monospace; font-size: 0.56rem; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: rgba(255, 255, 255, 0.62); padding: 0.85rem 0.55rem 0.75rem; }
+.md-typeset .tabbed-labels > label:hover { color: #FFFFFF; }
+.md-typeset .tabbed-set > input:checked + label, .md-typeset .tabbed-alternate input:checked ~ .tabbed-labels > label.tabbed-labels__active { color: #FFFFFF; }
+.md-typeset .tabbed-labels--linked > label > a { color: inherit; }
+.md-typeset .tabbed-labels:before { background: transparent !important; height: 0; border-bottom: 3px dashed #00E0B8; }
+.md-typeset .tabbed-set { border: 1.5px solid #232F3E; border-radius: 13px; }
+.md-typeset .tabbed-content { padding: 0.2rem 1rem 0.4rem; }
+[data-md-color-scheme="slate"] .md-typeset .tabbed-set { border-color: #3D4E5E; }
+
+/* the active lane name: white paint (Material colors it with the accent, which is ink here) */
+.md-typeset .tabbed-alternate input:nth-child(1):checked ~ .tabbed-labels > :nth-child(1),
+.md-typeset .tabbed-alternate input:nth-child(2):checked ~ .tabbed-labels > :nth-child(2),
+.md-typeset .tabbed-alternate input:nth-child(3):checked ~ .tabbed-labels > :nth-child(3),
+.md-typeset .tabbed-alternate input:nth-child(4):checked ~ .tabbed-labels > :nth-child(4),
+.md-typeset .tabbed-alternate input:nth-child(5):checked ~ .tabbed-labels > :nth-child(5),
+.md-typeset .tabbed-alternate input:nth-child(6):checked ~ .tabbed-labels > :nth-child(6),
+.md-typeset .tabbed-alternate input:nth-child(7):checked ~ .tabbed-labels > :nth-child(7),
+.md-typeset .tabbed-alternate input:nth-child(8):checked ~ .tabbed-labels > :nth-child(8),
+.md-typeset .tabbed-alternate input:nth-child(9):checked ~ .tabbed-labels > :nth-child(9),
+.md-typeset .tabbed-alternate input:nth-child(10):checked ~ .tabbed-labels > :nth-child(10) { color: #FFFFFF !important; }
+
+/* callouts as road signs: coal title plate, painted lane edge */
+.md-typeset .admonition, .md-typeset details { box-shadow: none; border: 1.5px solid #232F3E; border-left: 1.5px solid #232F3E; border-radius: 12px; overflow: hidden; background: #F6F8F9; font-size: 0.72rem; }
+.md-typeset .admonition > .admonition-title, .md-typeset details > summary { background: #232F3E !important; color: #FFFFFF !important; font-family: "Geist Mono", monospace; font-size: 0.6rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; border: 0; border-bottom: 3px dashed #00E0B8; padding-top: 0.55rem; padding-bottom: 0.5rem; }
+.md-typeset .admonition > .admonition-title::before, .md-typeset details > summary::before { background-color: #00E0B8 !important; }
+.md-typeset .admonition > .admonition-title code { background: rgba(255, 255, 255, 0.1); color: #FFFFFF; text-transform: none; letter-spacing: 0; }
+[data-md-color-scheme="slate"] .md-typeset .admonition, [data-md-color-scheme="slate"] .md-typeset details { background: #232F3E; border-color: #3D4E5E; }
+.md-typeset pre > code { border-radius: 10px; }
+
+/* ---------- home ---------- */
+.ex { font-family: "Public Sans", sans-serif; color: #232F3E; }
+.ex-wrap { max-width: 1248px; margin: 0 auto; padding: 0 32px; box-sizing: border-box; }
+.ex-hero { position: relative; background: #232F3E; }
+.ex-hero__art { display: block; width: 100%; height: auto; }
+.ex-hero__copy { position: absolute; left: 3.125%; top: 0; width: 36%; padding-top: 3.3vw; }
+.ex-hero__copy h1 { font-family: "Hanken Grotesk", sans-serif; font-weight: 300; font-size: 4.5vw; line-height: 1; letter-spacing: -0.045em; color: #FFFFFF; margin: 0 0 1.9vw; }
+.ex-hero__sub { font-size: 1.25vw; line-height: 1.45; color: #DFE9F6; margin: 0 0 1.4vw; max-width: 30vw; }
+.ex-cta { display: flex; gap: 10px; }
+.ex-btn { display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 20px; border-radius: 999px; font-size: 15px; font-weight: 600; border: 1.5px solid transparent; }
+.ex-btn--green { background: #00E0B8; color: #232F3E !important; }
+.ex-btn--green:hover { background: #00C9A4; }
+.ex-btn--line { border-color: rgba(255, 255, 255, 0.45); color: #FFFFFF !important; }
+.ex-btn--line:hover { background: rgba(255, 255, 255, 0.08); }
+.ex-btn svg { width: 16px; height: 16px; fill: currentColor; }
+
+.ex-sec { padding-top: 64px; }
+.ex-sec h2 { font-family: "Hanken Grotesk", sans-serif; font-weight: 300; font-size: 34px; letter-spacing: -0.03em; margin: 0 0 24px; color: #232F3E; }
+.ex-three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; }
+.ex-spot { display: flex; flex-direction: column; gap: 8px; color: #232F3E !important; }
+.ex-spot img { display: block; width: 100%; height: auto; border-radius: 18px; margin-bottom: 10px; transition: transform 0.15s; }
+.ex-spot:hover img { transform: translateY(-4px); }
+.ex-spot__k { font-family: "Geist Mono", monospace; font-size: 12.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #0A7A67; }
+.ex-spot__t { font-family: "Hanken Grotesk", sans-serif; font-size: 23px; font-weight: 400; line-height: 1.2; letter-spacing: -0.02em; }
+.ex-spot__d { font-size: 14.5px; line-height: 1.6; color: #3D4E5E; }
+.ex-spot__d code { font-family: "Geist Mono", monospace; font-size: 0.9em; background: #F6F8F9; padding: 1px 5px; border-radius: 4px; }
+.ex-strip { display: block; width: 100%; max-width: 966px; height: auto; }
+.ex-note { font-size: 15px; color: #3D4E5E; margin: 18px 0 0; }
+.ex-l { display: block; } .ex-d { display: none !important; }
+[data-md-color-scheme="slate"] .ex-l { display: none !important; }
+[data-md-color-scheme="slate"] .ex-d { display: block !important; }
+.ex-index { padding-bottom: 80px; }
+.ex-cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px; }
+.ex-cols > div { border-top: 3px dashed #232F3E; padding-top: 14px; display: flex; flex-direction: column; gap: 9px; }
+.ex-cols h3 { font-family: "Geist Mono", monospace; font-size: 12.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: #232F3E; margin: 0 0 6px; }
+.ex-cols a { font-size: 16px; color: #3D4E5E !important; }
+.ex-cols a:hover { color: #0A7A67 !important; }
+[data-md-color-scheme="slate"] .ex, [data-md-color-scheme="slate"] .ex-sec h2, [data-md-color-scheme="slate"] .ex-spot, [data-md-color-scheme="slate"] .ex-cols h3 { color: #FFFFFF !important; }
+[data-md-color-scheme="slate"] .ex-spot__d, [data-md-color-scheme="slate"] .ex-note, [data-md-color-scheme="slate"] .ex-cols a { color: #DFE9F6 !important; }
+[data-md-color-scheme="slate"] .ex-cols > div { border-top-color: #3D4E5E; }
+@media screen and (max-width: 76.1875em) {
+  .ex-three { grid-template-columns: 1fr; }
+  .ex-cols { grid-template-columns: 1fr 1fr; }
+}

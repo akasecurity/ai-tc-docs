@@ -1,344 +1,68 @@
 {% extends "main.html" %}
 
 {#
-  Home-page browser tab title. Overrides Material's default (which produced a
-  duplicated "aka AI-TC - aka AI-TC") so the tab matches the social card. Only
-  affects the home page; interior pages keep their per-page titles.
+  Direction E, "Cover art". A full-bleed coal hero band carrying the dark cover art; the H1 and
+  two buttons sit in the art's open verge. Then Detect / Decide / Record spot illustrations in
+  the same style, the outcome lanes, and the doc sections as a clean index.
 #}
 {% block htmltitle %}
-  <title>AKA Security — AI Traffic Control (AI-TC)</title>
+  <title>AI Traffic Control (ai-tc) | AKA Security</title>
 {% endblock %}
 
 {% block tabs %}
   {{ super() }}
-
-  <section class="mdx-hero" id="mdx-hero">
-    <span class="mdx-hero__sprite mdx-hero__sprite--disc" aria-hidden="true"></span>
-    <span class="mdx-hero__sprite mdx-hero__sprite--ring" aria-hidden="true"></span>
-    <div class="mdx-hero__bleed" aria-hidden="true"></div>
-
-    <div class="mdx-hero__inner">
-      <div class="mdx-hero__grid">
-        <div class="mdx-hero__copy">
-          <p class="mdx-hero__eyebrow">AI-TC Open source plugin &middot; Agent Harness Security</p>
-          <h1 class="mdx-hero__title">
-            The security layer for<br>
-            <span class="mdx-hero__accent">your agent harness</span>
-          </h1>
-          <p class="mdx-hero__lede">
-            AKA AI-TC intercepts prompts and tool calls before they reach the model,
-            scans them against your rule packs, and enforces policy &mdash;
-            entirely on your machine, with zero backend.
-          </p>
-          <div class="mdx-hero__cta">
-            <a class="md-button md-button--primary" href="#quick-start">Quick Start</a>
-            <a class="md-button" href="https://github.com/akasecurity/ai-tc">GitHub</a>
-          </div>
-          <div class="mdx-hero__proof">
-            <span class="mdx-hero__stat"><span class="mdx-hero__stat-value">Open source</span></span>
-            <span class="mdx-hero__stat"><span class="mdx-hero__stat-value">Local</span></span>
-            <span class="mdx-hero__stat"><span class="mdx-hero__stat-value">Auditable</span></span>
-          </div>
-        </div>
-
-        <figure class="mdx-monitor" aria-label="AKA session monitor: a live stream of detections and enforcement decisions.">
-          <div class="mdx-monitor__bar">
-            <span class="mdx-monitor__name">
-              <svg width="16" height="16" viewBox="0 0 108 236" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <path d="M54 118H0C0 88.3759 24.3759 64 54 64C83.6241 64 108 88.3759 108 118H54Z" fill="currentColor"/>
-                <path d="M54 118H108C108 147.624 83.6241 172 54 172C24.3759 172 0 147.624 0 118H54Z" fill="currentColor" fill-opacity="0.55"/>
-                <path d="M81 54C95.9117 54 108 41.9117 108 27C108 12.0883 95.9117 0 81 0C66.0883 0 54 12.0883 54 27C54 41.9117 66.0883 54 81 54Z" fill="currentColor"/>
-                <path d="M27 236C41.9117 236 54 223.912 54 209C54 194.088 41.9117 182 27 182C12.0883 182 0 194.088 0 209C0 223.912 12.0883 236 27 236Z" fill="currentColor" fill-opacity="0.55"/>
-              </svg>
-              aka <span class="mdx-monitor__sub">session monitor</span>
-            </span>
-            <span class="mdx-monitor__status">local-first</span>
-          </div>
-          <ul class="mdx-monitor__feed" id="mdx-monitor-feed" data-mdx-monitor>
-            <li class="mev mev-allow"><span class="mev-tool">read</span><span class="mev-arg">src/api/payments.ts</span><span class="mev-verdict">allow</span></li>
-            <li class="mev mev-block"><span class="mev-tool">detect</span><span class="mev-arg">secrets/aws-access-key</span><span class="mev-verdict">block</span></li>
-            <li class="mev mev-allow"><span class="mev-tool">edit</span><span class="mev-arg">src/services/notify.ts</span><span class="mev-verdict">allow</span></li>
-            <li class="mev mev-redact"><span class="mev-tool">detect</span><span class="mev-arg">core-pii/email</span><span class="mev-verdict">redact</span></li>
-            <li class="mev mev-warn"><span class="mev-tool">detect</span><span class="mev-arg">core-pii/ssn</span><span class="mev-verdict">warn</span></li>
-            <li class="mev mev-allow"><span class="mev-tool">prompt</span><span class="mev-arg">support-script.md</span><span class="mev-verdict">allow</span></li>
-          </ul>
-          <div class="mdx-monitor__foot">
-            <span>store <b>~/.aka/data/aka.db</b></span>
-            <span>local</span>
-          </div>
-        </figure>
-      </div>
-    </div>
-  </section>
-
-  <script>
-    (function () {
-      var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-      var feed = document.getElementById("mdx-monitor-feed");
-      var pool = [
-        { tool: "read", arg: "src/api/payments.ts", verdict: "allow" },
-        { tool: "detect", arg: "secrets/aws-access-key", verdict: "block" },
-        { tool: "detect", arg: "secrets/github-pat", verdict: "block" },
-        { tool: "edit", arg: "src/services/notify.ts", verdict: "allow" },
-        { tool: "detect", arg: "core-pii/email", verdict: "redact" },
-        { tool: "detect", arg: "core-pii/ssn", verdict: "warn" },
-        { tool: "prompt", arg: "support-script.md", verdict: "allow" },
-        { tool: "detect", arg: "financial/card-number", verdict: "redact" },
-        { tool: "scan", arg: ".env.local", verdict: "warn" },
-        { tool: "read", arg: "~/.ssh/id_ed25519", verdict: "block" }
-      ];
-      if (feed && !reduced) {
-        var n = 0;
-        setInterval(function () {
-          var next = pool[n % pool.length];
-          n++;
-          var li = document.createElement("li");
-          li.className = "mev mev-" + next.verdict + " mev-enter";
-          li.innerHTML =
-            '<span class="mev-tool">' + next.tool + '</span>' +
-            '<span class="mev-arg">' + next.arg + '</span>' +
-            '<span class="mev-verdict">' + next.verdict + '</span>';
-          feed.insertBefore(li, feed.firstChild);
-          while (feed.children.length > 6) {
-            feed.removeChild(feed.lastChild);
-          }
-        }, 1800);
-      }
-    })();
-  </script>
-
-  <section class="mdx-flagship">
-    <div class="mdx-flagship__inner">
-      <div class="mdx-flagship__card">
-        <div class="mdx-flagship__visual">
-          <div class="mdx-flow__bar">
-            <span>Traffic flow</span>
-          </div>
-          <div class="mdx-flow__body">
-            <svg viewBox="0 0 420 300" role="img" aria-label="Prompts, tool calls, responses, and file reads flow into the AKA control node, which routes each one to monitor, warn, redact, block, or a manual exception.">
-              <path class="mdx-flow__arrow" d="M124,25 C135,25 135,132 145,132" />
-              <path class="mdx-flow__arrow" d="M124,89 C135,89 135,132 145,132" />
-              <path class="mdx-flow__arrow" d="M124,153 C135,153 135,132 145,132" />
-              <path class="mdx-flow__arrow" d="M124,217 C135,217 135,132 145,132" />
-              <path class="mdx-flow__arrow" d="M145,132 L149,132" marker-end="url(#mdx-flow-arrowhead)" />
-
-              <rect class="mdx-flow__node" x="6" y="10" width="118" height="30" rx="6" />
-              <text class="mdx-flow__node-label" x="65" y="29">Prompts</text>
-              <rect class="mdx-flow__node" x="6" y="74" width="118" height="30" rx="6" />
-              <text class="mdx-flow__node-label" x="65" y="93">Tool calls</text>
-              <rect class="mdx-flow__node" x="6" y="138" width="118" height="30" rx="6" />
-              <text class="mdx-flow__node-label" x="65" y="157">Responses</text>
-              <rect class="mdx-flow__node" x="6" y="202" width="118" height="30" rx="6" />
-              <text class="mdx-flow__node-label" x="65" y="221">File reads</text>
-
-              <path class="mdx-flow__arrow" d="M271,113 C290,113 290,24 296,24" marker-end="url(#mdx-flow-arrowhead)" />
-              <path class="mdx-flow__arrow" d="M271,124 C290,124 290,78 296,78" marker-end="url(#mdx-flow-arrowhead)" />
-              <path class="mdx-flow__arrow" d="M271,132 C290,132 290,132 296,132" marker-end="url(#mdx-flow-arrowhead)" />
-              <path class="mdx-flow__arrow" d="M271,140 C290,140 290,186 296,186" marker-end="url(#mdx-flow-arrowhead)" />
-              <path class="mdx-flow__arrow" d="M271,151 C290,151 290,240 296,240" marker-end="url(#mdx-flow-arrowhead)" />
-
-              <rect class="mdx-flow__control" x="161" y="105" width="110" height="54" rx="8" />
-              <text class="mdx-flow__control-label" x="216" y="128">AKA</text>
-              <text class="mdx-flow__control-sub" x="216" y="145">policy engine</text>
-
-              <rect class="mdx-flow__outcome mdx-flow__outcome--monitor" x="308" y="10" width="104" height="28" rx="6" />
-              <text class="mdx-flow__outcome-label mdx-flow__outcome-label--monitor" x="360" y="28">Monitor</text>
-              <rect class="mdx-flow__outcome mdx-flow__outcome--warn" x="308" y="64" width="104" height="28" rx="6" />
-              <text class="mdx-flow__outcome-label mdx-flow__outcome-label--warn" x="360" y="82">Warn</text>
-              <rect class="mdx-flow__outcome mdx-flow__outcome--redact" x="308" y="118" width="104" height="28" rx="6" />
-              <text class="mdx-flow__outcome-label mdx-flow__outcome-label--redact" x="360" y="136">Redact</text>
-              <rect class="mdx-flow__outcome mdx-flow__outcome--block" x="308" y="172" width="104" height="28" rx="6" />
-              <text class="mdx-flow__outcome-label mdx-flow__outcome-label--block" x="360" y="190">Block</text>
-              <rect class="mdx-flow__outcome mdx-flow__outcome--exception" x="308" y="226" width="104" height="28" rx="6" />
-              <text class="mdx-flow__outcome-label mdx-flow__outcome-label--exception" x="360" y="244">Exception</text>
-
-              <defs>
-                <marker id="mdx-flow-arrowhead" markerWidth="8" markerHeight="8" refX="0" refY="4" orient="auto">
-                  <path class="mdx-flow__arrowhead" d="M0,0 L8,4 L0,8 Z" />
-                </marker>
-              </defs>
-            </svg>
-          </div>
-        </div>
-
-        <div class="mdx-flagship__copy">
-          <div class="mdx-flagship__title">
-            <span class="mdx-flagship__name">AI Traffic Control</span>
-            <span class="mdx-flagship__handle">ai-tc</span>
-          </div>
-          <p class="mdx-flagship__desc">
-            AKA AI-TC (AI Traffic Control) is an open-source control plane that
-            sits between your data and AI tools &mdash; intercepting
-            prompts, scanning for sensitive data, enforcing policy, and giving
-            full control into what's being shared with AI models.
-          </p>
-          <div class="mdx-flagship__chips">
-            <span class="mdx-chip">Open Source</span>
-            <span class="mdx-chip">Local-first</span>
-            <span class="mdx-chip">Claude Code Plugin</span>
-          </div>
-          <div class="mdx-flagship__cta">
-            <a class="md-button md-button--primary" href="https://github.com/akasecurity/ai-tc">GitHub</a>
-            <a class="mdx-flagship__link" href="getting-started/how-it-works/">How it works &rarr;</a>
-          </div>
+  <div class="ex">
+    <section class="ex-hero">
+      <img class="ex-hero__art" src="assets/cover-dark-plain.svg" alt="Illustration: prompts, tool calls, responses and file reads arrive as vehicles, pass under the ai-tc policy engine gate, and leave in five lanes: monitor, warn, redact, block and exception.">
+      <div class="ex-hero__copy">
+        <h1>AI Traffic Control</h1>
+        <div class="ex-cta">
+          <a class="ex-btn ex-btn--green" href="getting-started/installation/">Install the plugin</a>
+          <a class="ex-btn ex-btn--line" href="https://github.com/akasecurity/ai-tc"><svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path d="M6.766 11.328c-2.063-.25-3.516-1.734-3.516-3.656 0-.781.281-1.625.75-2.188-.203-.515-.172-1.609.063-2.062.625-.078 1.468.25 1.968.703.594-.187 1.219-.281 1.985-.281.765 0 1.39.094 1.953.265.484-.437 1.344-.765 1.969-.687.218.422.25 1.515.046 2.047.5.593.766 1.39.766 2.203 0 1.922-1.453 3.375-3.547 3.64.531.344.89 1.094.89 1.954v1.625c0 .468.391.734.86.547C13.781 14.359 16 11.53 16 8.03 16 3.61 12.406 0 7.984 0 3.563 0 0 3.61 0 8.031a7.88 7.88 0 0 0 5.172 7.422c.422.156.828-.125.828-.547v-1.25c-.219.094-.5.156-.75.156-1.031 0-1.64-.562-2.078-1.609-.172-.422-.36-.672-.719-.719-.187-.015-.25-.093-.25-.187 0-.188.313-.328.625-.328.453 0 .844.281 1.25.86.313.452.64.655 1.031.655s.641-.14 1-.5c.266-.265.47-.5.657-.656"/></svg>GitHub</a>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="mdx-install" id="quick-start">
-    <div class="mdx-install__card">
-      <div class="mdx-install__copy">
-        <p class="mdx-install__eyebrow">Get started in minutes</p>
-        <h2 class="mdx-install__title">Install the plugin</h2>
-        <p class="mdx-install__desc">
-          The plugin + <code>aka</code> CLI write a local SQLite store
-          (<code>~/.aka/data/aka.db</code>) and the OSS web-ui reads it
-          directly &mdash; no backend, no Postgres, no account.
-        </p>
-        <p class="mdx-install__more">
-          See the full <a href="getting-started/installation/">installation guide</a>
-          for the step-by-step walkthrough &mdash; installing the plugin,
-          triggering a detection, and opening the dashboard. Codex CLI,
-          Antigravity, and ChatGPT / Claude.ai web chat have their own
-          <a href="plugins/codex/">plugins</a>, all writing the same local store.
-        </p>
-      </div>
-      <div class="mdx-terminal">
-        <div class="mdx-terminal__bar">
-          <i></i><i></i><i></i><span>Terminal</span>
-          <button class="mdx-terminal__copy" type="button" data-mdx-copy aria-label="Copy install commands">
-            <span data-mdx-copy-label>Copy</span>
-          </button>
-        </div>
-        <pre class="mdx-terminal__pre" data-mdx-copy-source><span class="cmt"># In the Claude Code CLI</span>
-/plugin marketplace add akasecurity/marketplace
-/plugin install ai-tc@akasecurity
-/aka:setup
-
-<span class="cmt"># or the local-first CLI (macOS / Linux)</span>
-<span class="pmt">$</span> curl -fsSL https://akasecurity.io/install.sh | sh
-<span class="pmt">$</span> aka init</pre>
-      </div>
-    </div>
-  </section>
-
-  <script>
-    (function () {
-      var btn = document.querySelector("[data-mdx-copy]");
-      var source = document.querySelector("[data-mdx-copy-source]");
-      var label = document.querySelector("[data-mdx-copy-label]");
-      if (!btn || !source || !label) return;
-      btn.addEventListener("click", function () {
-        var text = source.innerText
-          .split("\n")
-          .filter(function (line) { return line.trim().indexOf("#") !== 0 && line.trim() !== ""; })
-          .map(function (line) { return line.replace(/^\$\s*/, ""); })
-          .join("\n");
-        navigator.clipboard.writeText(text).then(function () {
-          label.textContent = "Copied";
-          btn.classList.add("mdx-terminal__copy--done");
-          setTimeout(function () {
-            label.textContent = "Copy";
-            btn.classList.remove("mdx-terminal__copy--done");
-          }, 1800);
-        });
-      });
-    })();
-  </script>
-
-  <section class="mdx-install mdx-local" id="local-architecture">
-    <div class="mdx-install__card mdx-local__card">
-      {% include "partials/local_arch_diagram.html" %}
-
-      <div class="mdx-install__copy">
-        <p class="mdx-install__eyebrow">Runs entirely on your machine</p>
-        <h2 class="mdx-install__title">No backend, no cloud, no account</h2>
-        <p class="mdx-install__desc">
-          The plugin and <code>aka</code> CLI write straight to a local SQLite
-          store at <code>~/.aka/data/aka.db</code>, and the OSS dashboard
-          reads that same file directly &mdash; no server to stand up, no
-          Postgres, no account to create.
-        </p>
-        <p class="mdx-install__more">
-          See the <a href="getting-started/cli/">CLI guide</a> for how
-          the plugin, CLI, and dashboard all share that single local store.
-        </p>
-      </div>
-    </div>
-  </section>
-
-  <section class="mdx-install mdx-detections" id="detections">
-    <div class="mdx-install__card">
-      <div class="mdx-install__copy">
-        <p class="mdx-install__eyebrow">7 rule packs &middot; 100+ detections</p>
-        <h2 class="mdx-install__title">Detect everything, enforce what matters</h2>
-        <p class="mdx-install__desc">
-          Every rule ships active under the log-only <strong>Monitor</strong>
-          policy. Promote any detection to <strong>Warn</strong>,
-          <strong>Redact</strong>, or <strong>Block</strong> from the
-          dashboard &mdash; per rule, per category, or org-wide.
-        </p>
-        <p class="mdx-install__more">
-          See the full <a href="rules/built-in/">list of built-in rules</a>,
-          or learn how to <a href="rules/writing-rules/">write your own</a>.
-        </p>
-      </div>
-
-      <div class="mdx-catalog">
-        <div class="mdx-terminal__bar mdx-diagram__bar">
-          <span>Detection catalog</span>
-        </div>
-        <div class="mdx-catalog__body">
-          <div class="mdx-catalog__actions">
-            <span class="mdx-catalog__action mdx-catalog__action--monitor">Monitor</span>
-            <span class="mdx-catalog__action mdx-catalog__action--warn">Warn</span>
-            <span class="mdx-catalog__action mdx-catalog__action--redact">Redact</span>
-            <span class="mdx-catalog__action mdx-catalog__action--block">Block</span>
-          </div>
-          <ul class="mdx-catalog__packs">
-            <li><span>Secrets</span><span>21 rules</span></li>
-            <li><span>Secrets Infra</span><span>13 rules</span></li>
-            <li><span>Core PII</span><span>14 rules</span></li>
-            <li><span>Core Financial</span><span>8 rules</span></li>
-            <li><span>Core PHI</span><span>8 rules</span></li>
-            <li><span>Core Code Context</span><span>8 rules</span></li>
-            <li><span>Code Flaws</span><span>29 rules</span></li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="mdx-features">
-    <div class="mdx-features__grid">
-      <a class="mdx-feature" href="getting-started/how-it-works/">
-        <span class="mdx-feature__tag">01</span>
-        <span class="mdx-feature__title">Architecture</span>
-        <span class="mdx-feature__desc">How the plugin, detection engine, and local SQLite store fit together.</span>
-        <span class="mdx-feature__arrow">&rarr;</span>
-      </a>
-      <a class="mdx-feature" href="rules/built-in/">
-        <span class="mdx-feature__tag">02</span>
-        <span class="mdx-feature__title">Detections</span>
-        <span class="mdx-feature__desc">View our open source library of 100+ detections.</span>
-        <span class="mdx-feature__arrow">&rarr;</span>
-      </a>
-      <a class="mdx-feature" href="https://github.com/akasecurity/preflight-skills">
-          <span class="mdx-feature__tag">03</span>
-          <span class="mdx-feature__title">Preflight Skills</span>
-          <span class="mdx-feature__desc">A second opinion before you merge — multi-model code review for coding agents.</span>
-          <span class="mdx-feature__arrow">&rarr;</span>
+    <section class="ex-sec ex-wrap">
+      <div class="ex-three">
+        <a class="ex-spot" href="getting-started/how-it-works/">
+          <img src="assets/spot-detect-light.svg" alt="" class="ex-l"><img src="assets/spot-detect-dark.svg" alt="" class="ex-d">
+          <span class="ex-spot__k">01 Detect</span>
+          <span class="ex-spot__t">Each event is scanned against your rule packs.</span>
+          <span class="ex-spot__d">Mostly regex, with a validator where shape is not enough: a Luhn checksum for card numbers, a Shannon-entropy check for secrets.</span>
         </a>
-        <a class="mdx-feature" href="https://github.com/akasecurity/claude-tools">
-          <span class="mdx-feature__tag">04</span>
-          <span class="mdx-feature__title">Claude Tools</span>
-          <span class="mdx-feature__desc">Make Claude Code safer to use. Clean context, locked-down credentials, guarded egress.</span>
-          <span class="mdx-feature__arrow">&rarr;</span>
+        <a class="ex-spot" href="getting-started/how-it-works/">
+          <img src="assets/spot-decide-light.svg" alt="" class="ex-l"><img src="assets/spot-decide-dark.svg" alt="" class="ex-d">
+          <span class="ex-spot__k">02 Decide</span>
+          <span class="ex-spot__t">Policy picks the outcome, per rule or per category.</span>
+          <span class="ex-spot__d">Prompts and tool inputs are checked before they reach the model; tool output and file reads after it responds.</span>
         </a>
-    </div>
-  </section>
+        <a class="ex-spot" href="getting-started/usage/">
+          <img src="assets/spot-record-light.svg" alt="" class="ex-l"><img src="assets/spot-record-dark.svg" alt="" class="ex-d">
+          <span class="ex-spot__k">03 Record</span>
+          <span class="ex-spot__t">Every match becomes a finding, kept on your machine.</span>
+          <span class="ex-spot__d">Rule id, category, severity and matched span, in one SQLite file: <code>~/.aka/data/aka.db</code>.</span>
+        </a>
+      </div>
+    </section>
+
+    <section class="ex-sec ex-wrap">
+      <h2>Five lanes out of the gate.</h2>
+      <img src="assets/outcomes-light.svg" class="ex-l ex-strip" alt="The five policy outcomes: monitor, warn, redact, block, and exception (set apart).">
+      <img src="assets/outcomes-dark.svg" class="ex-d ex-strip" alt="" aria-hidden="true">
+      <p class="ex-note">Most rules ship on monitor; on a new install the vendor-key secrets and risky-command packs start on warn.</p>
+    </section>
+
+    <section class="ex-sec ex-wrap ex-index">
+      <h2>The docs.</h2>
+      <div class="ex-cols">
+        <div><h3>Getting started</h3><a href="getting-started/installation/">Installation</a><a href="getting-started/how-it-works/">How it works</a><a href="getting-started/usage/">Usage</a><a href="getting-started/exceptions/">Adding exceptions</a><a href="getting-started/cli/">Using the CLI</a></div>
+        <div><h3>Plugins</h3><a href="plugins/claude-code/">Claude Code</a><a href="plugins/claude-desktop/">Claude Desktop</a><a href="plugins/codex/">Codex CLI</a><a href="plugins/antigravity/">Antigravity</a><a href="plugins/browser-extension/">Browser extension</a></div>
+        <div><h3>Detections</h3><a href="rules/built-in/">Built-in detections</a><a href="rules/writing-rules/">Writing rules</a><a href="rules/publishing/">Publishing</a></div>
+        <div><h3>Architecture</h3><a href="architecture/overview/">System overview</a><a href="architecture/data-flow/">Data flow</a><a href="architecture/detection-engine/">Detection engine</a><a href="architecture/physical-design/">Physical design</a></div>
+      </div>
+    </section>
+  </div>
 {% endblock %}
 
 {% block content %}{% endblock %}
