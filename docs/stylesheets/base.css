@@ -1,0 +1,29 @@
+/* ds-v1 type, self-hosted (docs/assets/fonts): Hanken Grotesk display,
+   Public Sans body, Geist Mono code. No third-party font requests. */
+@font-face { font-family: "Hanken Grotesk"; src: url("../assets/fonts/hanken-grotesk-latin.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Public Sans"; src: url("../assets/fonts/public-sans-latin.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: "Geist Mono"; src: url("../assets/fonts/geist-mono-latin.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+
+:root {
+  --md-text-font: "Public Sans";
+  --md-code-font: "Geist Mono";
+  --aka-coal: #232F3E;
+  --aka-mint: #00E0B8;
+  --aka-ink: #0A7A67;
+  --aka-offwhite: #F6F8F9;
+  --aka-silver: #DFE9F6;
+  --aka-fg1: #3D4E5E;
+  --aka-fg2: #5A6C7E;
+  --aka-line: rgba(35, 47, 62, 0.12);
+}
+.md-typeset h1, .md-typeset h2, .md-typeset h3, .md-typeset h4, .md-typeset h5, .md-typeset h6 {
+  font-family: "Hanken Grotesk", var(--md-text-font-family), system-ui, sans-serif;
+}
+/* Flat: no elevation anywhere. */
+.md-header, .md-header--shadow, .md-tabs, .md-search__form, .md-search__output, .md-top { box-shadow: none !important; }
+
+/* Admonitions: flat, brand-colored (warning and danger keep their own color). */
+.md-typeset :is(.admonition, details):is(.note, .info, .tip, .abstract, .example, .question, .success) { border-color: #DFE9F6; }
+.md-typeset :is(.note, .info, .tip, .abstract, .example, .question, .success) > :is(.admonition-title, summary) { background-color: #F6F8F9; color: #232F3E; }
+.md-typeset :is(.note, .info, .tip, .abstract, .example, .question, .success) > :is(.admonition-title, summary)::before { background-color: #0A7A67; }
+.md-footer, .md-footer-meta { background-color: #1B2531; }
