@@ -17,7 +17,7 @@ comments: true
 
     Restart Claude Code afterwards to load the plugin.
 
-    [`claude-tools`](https://github.com/akasecurity/claude-tools) can also install the AKA plugin as part of setting up a Claude Code profile — see that repo for the current install command.
+    [`claude-tools`](https://github.com/akasecurity/aka-claude-tools) can also install the AKA plugin as part of setting up a Claude Code profile — see that repo for the current install command.
 
 === "Claude Desktop"
 
