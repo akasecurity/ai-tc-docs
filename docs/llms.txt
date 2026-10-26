@@ -1,0 +1,36 @@
+# AKA AI-TC docs
+
+> Documentation for AI Traffic Control (AI-TC), an open-source control plane from AKA Security that checks every prompt and tool call an AI coding agent makes before it runs. It runs on the developer's machine and ships as plugins for Claude Code, Codex, Claude Desktop, Antigravity and the browser.
+
+AKA Security is a security engineering company; AI-TC is one of the open-source tools it builds. Company site: https://akasecurity.io. Source: https://github.com/akasecurity/ai-tc.
+
+## Start here
+- [Home](https://akasecurity.github.io/ai-tc-docs/): What AI-TC is.
+- [How it works](https://akasecurity.github.io/ai-tc-docs/getting-started/how-it-works/): How a prompt, tool call or response is checked inside an agent harness session.
+- [Installation](https://akasecurity.github.io/ai-tc-docs/getting-started/installation/): Install the plugin for your harness.
+- [Usage](https://akasecurity.github.io/ai-tc-docs/getting-started/usage/): Day-to-day use.
+- [The aka CLI](https://akasecurity.github.io/ai-tc-docs/getting-started/cli/): CLI reference.
+- [Adding exceptions](https://akasecurity.github.io/ai-tc-docs/getting-started/exceptions/): Allow a specific detection on purpose.
+- [Updates](https://akasecurity.github.io/ai-tc-docs/getting-started/updates/): Keeping the CLI and plugins current.
+
+## Plugins
+- [Claude Code](https://akasecurity.github.io/ai-tc-docs/plugins/claude-code/)
+- [Codex CLI](https://akasecurity.github.io/ai-tc-docs/plugins/codex/)
+- [Claude Desktop](https://akasecurity.github.io/ai-tc-docs/plugins/claude-desktop/)
+- [Antigravity](https://akasecurity.github.io/ai-tc-docs/plugins/antigravity/)
+- [Browser extension](https://akasecurity.github.io/ai-tc-docs/plugins/browser-extension/)
+- [Uninstalling](https://akasecurity.github.io/ai-tc-docs/plugins/uninstalling/)
+
+## Detections
+- [Built-in detections](https://akasecurity.github.io/ai-tc-docs/rules/built-in/): The seven rule packs that ship with the plugin, 101 detection rules in total.
+- [Writing detection rules](https://akasecurity.github.io/ai-tc-docs/rules/writing-rules/): Rule format and rule packs.
+- [Publishing rules](https://akasecurity.github.io/ai-tc-docs/rules/publishing/): Distributing rules through the global rule registry.
+
+## Architecture
+- [System overview](https://akasecurity.github.io/ai-tc-docs/architecture/overview/)
+- [Data flow](https://akasecurity.github.io/ai-tc-docs/architecture/data-flow/)
+- [Detection engine](https://akasecurity.github.io/ai-tc-docs/architecture/detection-engine/)
+- [Physical design](https://akasecurity.github.io/ai-tc-docs/architecture/physical-design/)
+
+## Optional
+- [Contributing](https://akasecurity.github.io/ai-tc-docs/getting-started/contributing/): Build AI-TC from source.
