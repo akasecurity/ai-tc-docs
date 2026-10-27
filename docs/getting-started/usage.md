@@ -4,7 +4,7 @@ comments: true
 
 # Usage
 
-The most common way to work with AKA day-to-day is the `/aka:*` slash commands, run from inside a Claude Code or Claude Desktop session — the same plugin, same commands either way. They're all read-only and backed by the local SQLite store (`~/.aka/data/aka.db`), so they work with zero backend.
+The most common way to work with AKA day-to-day is the `/aka:*` slash commands, run from inside a Claude Code or Claude Desktop session — the same plugin, same commands either way. They're backed by the local SQLite store (`~/.aka/data/aka.db`), so they work with zero backend. All but two only read: `/aka:scan` records the findings it makes, and `/aka:setup` writes your settings once you confirm.
 
 | Command            | Shows                                                                           |
 | ------------------- | -------------------------------------------------------------------------------- |
@@ -16,6 +16,12 @@ The most common way to work with AKA day-to-day is the `/aka:*` slash commands, 
 | `/aka:tokens`      | token usage per provider/model (reconciled from transcripts) + estimated cost  |
 | `/aka:exceptions`  | active detection exceptions — masked value, rule, scope, expiry, uses          |
 | `/aka:detections`  | installed detection packs — version, rules, enabled, policy, update available  |
+| `/aka:setup`       | the onboarding / calibration wizard                                            |
+| `/aka:dashboard`   | launch the local web dashboard (via the `aka` CLI)                             |
+| `/aka:findings-pane` | this session's findings in a pane (registered by the plugin's mod)           |
+
+On Codex and Antigravity the same commands ship as `aka-*` skills; GitHub Copilot has only the
+`aka-setup` skill — use the `aka` CLI there.
 
 ### `/aka:health`
 
@@ -27,7 +33,7 @@ Reach for this right after something gets flagged, to see exactly what matched a
 
 ### `/aka:recommend`
 
-Run this when deciding what to tighten next. Most rules ship under the log-only Monitor policy, and this surfaces which categories have enough real activity to justify promoting to Warn, Redact, or Block.
+Run this when deciding what to tighten next. Most rules ship under the log-only Monitor policy (the `secrets` and `command-risk` packs ship on Warn), and this surfaces which categories have enough real activity to justify promoting to Warn, Redact, or Block.
 
 ### `/aka:audit`
 
@@ -43,7 +49,7 @@ Check this when you want visibility into spend — tracking usage across provide
 
 ### `/aka:exceptions`
 
-Check this before assuming a detection will fire — if something you expected to be blocked wasn't, an active exception is the first thing to rule out. It won't tell you how to grant one; that's intentionally only available out-of-band via the `aka` CLI.
+Check this before assuming a detection will fire — if something you expected to be blocked wasn't, an active exception is the first thing to rule out. It won't tell you how to grant one; that's intentionally only available out-of-band, via the `aka` CLI or the local dashboard's Exceptions page.
 
 ### `/aka:detections`
 
