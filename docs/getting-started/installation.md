@@ -59,6 +59,21 @@ comments: true
     [Known limitations](../plugins/antigravity.md#known-limitations) before relying on it for
     enforcement.
 
+=== "GitHub Copilot"
+
+    Copilot installs from an unpacked copy of the npm package. Keep the folder — updates come
+    from it:
+
+    ```bash
+    mkdir -p aka-copilot && cd aka-copilot
+    tar -xzf "$(npm pack @akasecurity/ai-tc-copilot --silent)"
+    copilot plugin install ./package
+    aka init
+    ```
+
+    Only shell commands can be blocked on this host, and VS Code agent mode is beta — see the
+    [Copilot plugin guide](../plugins/copilot.md).
+
 === "Browser (ChatGPT / Claude.ai)"
 
     Web chat is covered by a Chrome extension plus a local native-messaging host:
@@ -72,8 +87,8 @@ comments: true
 
 !!! tip "Already have the `aka` CLI?"
     `aka plugins list` shows every supported agent and whether it's installed, and
-    `aka plugins install <agent>` (`claude-code`, `codex`, `antigravity`) runs the host's own
-    plugin manager for you. Every plugin writes the same local store, so mixing agents just means
+    `aka plugins install <agent>` (`claude-code`, `codex`, `antigravity`, `copilot`) runs the host's own
+    plugin manager for you, or prints the steps for hosts that install from a local directory. Every plugin writes the same local store, so mixing agents just means
     more of your activity lands in one findings history.
 
 ## Install the `aka` CLI
@@ -133,7 +148,9 @@ Inside a session, run the onboarding wizard:
 ```
 
 On Codex and Antigravity there is no `/aka:*` command namespace — the same wizard ships as the
-**`aka-setup` skill**; ask for it by name in the session.
+**`aka-setup` skill**; ask for it by name in the session. GitHub Copilot has no calibration
+wizard yet — its `aka-setup` skill only explains what that host can enforce, so configure it
+with the `aka` CLI.
 
 The wizard calibrates AKA from your *actual* activity rather than a demo profile: it
 offers one retroactive scan of the last 30 days of Claude history, reports the real
@@ -224,4 +241,4 @@ Navigate to `http://localhost:4319/security` to see the Security page.
 - Use [the `aka` CLI](cli.md) for scanning, stats, and managing detection packs
 - Per-host hook internals and configuration details: [Claude Code](../plugins/claude-code.md),
   [Claude Desktop](../plugins/claude-desktop.md), [Codex CLI](../plugins/codex.md),
-  [Antigravity](../plugins/antigravity.md), [browser extension](../plugins/browser-extension.md)
+  [Antigravity](../plugins/antigravity.md), [GitHub Copilot](../plugins/copilot.md), [browser extension](../plugins/browser-extension.md)

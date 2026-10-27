@@ -6,7 +6,7 @@ comments: true
 
 Every AKA plugin is removed through its own host's plugin manager, followed by a restart. Claude
 Code and Claude Desktop run the **same plugin package** (`plugins/claude-code`), so those two
-flows are near-identical; Codex, Antigravity, and the browser extension each have their own. This
+flows are near-identical; Codex, Antigravity, GitHub Copilot, and the browser extension each have their own. This
 page covers all of them and, more importantly, what uninstalling **does and doesn't** clean up.
 
 ## Claude Code (CLI)
@@ -44,6 +44,17 @@ manager and restart the CLI. The extracted `./package` directory you installed f
 staging copy — deleting it after removal is safe (and deleting it *before* removal doesn't
 uninstall anything).
 
+## GitHub Copilot
+
+```bash
+copilot plugin uninstall aka-copilot
+copilot plugin list   # aka-copilot should no longer appear
+```
+
+For VS Code agent mode, also remove the folder's entry from `chat.pluginLocations` in your user
+settings. The `aka-copilot` folder you installed from is a staging copy — safe to delete once the
+plugin is removed from every surface that loads it.
+
 ## Browser extension
 
 Two halves to remove:
@@ -70,7 +81,7 @@ Desktop has no terminal, so removal happens in **Settings → Plugins**, mirrori
 Uninstalling unregisters the plugin from that one host:
 
 - Its hooks stop firing — prompts and tool calls are no longer scanned there, and nothing is warned, redacted, or blocked.
-- Its read surface disappears: the `/aka:*` slash commands on Claude Code/Desktop, the `aka-*` skills on Codex and Antigravity.
+- Its read surface disappears: the `/aka:*` slash commands on Claude Code/Desktop, the `aka-*` skills on Codex and Antigravity, the `aka-setup` skill on Copilot.
 
 It does **not** touch `~/.aka/` — the settings file, the local SQLite store (`~/.aka/data/aka.db`), the encryption keys under `~/.aka/keys/`, or the policy cache. That's intentional: every plugin shares that store, and so do the `aka` CLI and the dashboard, so uninstalling from one surface doesn't cut the others off from their findings history. It also doesn't disable the *other* hosts: findings from a still-installed Codex or Antigravity plugin keep arriving.
 
@@ -86,7 +97,7 @@ rm -rf ~/.aka
 ```
 
 !!! warning
-    This is shared state: it wipes findings/settings for **every** surface — Claude Code, Claude Desktop, Codex, Antigravity, the browser extension, and the `aka` CLI/dashboard. Uninstall the plugin from every surface first, or the next session start will just recreate `~/.aka` and start populating it again.
+    This is shared state: it wipes findings/settings for **every** surface — Claude Code, Claude Desktop, Codex, Antigravity, GitHub Copilot, the browser extension, and the `aka` CLI/dashboard. Uninstall the plugin from every surface first, or the next session start will just recreate `~/.aka` and start populating it again.
 
 ## Reinstalling later
 
