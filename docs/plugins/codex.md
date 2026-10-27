@@ -16,10 +16,10 @@ exposes. AKA's Codex plugin is served from this repo's own marketplace file:
 
 ```bash
 codex plugin marketplace add akasecurity/ai-tc
-codex plugin install aka-codex@ai-tc
+codex plugin add aka-codex@ai-tc
 ```
 
-Restart Codex afterwards to load the plugin. `node` must be on your PATH — the hooks are Node
+Codex has no `plugin install` verb — `add` installs and also updates. Restart Codex afterwards to load the plugin. `node` must be on your PATH — the hooks are Node
 scripts that Codex spawns.
 
 !!! note "Why a different marketplace than Claude Code"
@@ -41,10 +41,10 @@ Declared in `hooks/hooks.json` (`timeout` is in seconds; commands resolve `${PLU
 
 | Hook               | Matcher            | What AKA does                                                                    |
 | ------------------ | ------------------ | -------------------------------------------------------------------------------- |
-| `SessionStart`     | all sessions       | resolve and upsert this machine's inventory, open the session's audit-event root |
+| `SessionStart`     | all sessions       | resolve and upsert this machine's inventory, open the session's audit-event root; on an attached machine, say where the session's activity goes |
 | `UserPromptSubmit` | all prompts        | block or warn                                                                     |
-| `PreToolUse`       | `Bash\|apply_patch` | deny, **redact via `updatedInput`**, or warn                                      |
-| `PostToolUse`      | `Bash\|apply_patch` | withhold the whole tool result, or warn                                           |
+| `PreToolUse`       | `Bash\|apply_patch` | deny or warn; **redact in place** for `apply_patch` content only (see below)       |
+| `PostToolUse`      | `Bash\|apply_patch\|webrun\|mcp__.*` | withhold the whole tool result, or warn                          |
 | `Stop`             | end of turn        | trigger the background token-usage reconcile worker (detached; adds no latency)   |
 
 Codex's event names and stdin shapes match Claude Code's, which is why the two adapters share a
@@ -59,11 +59,30 @@ runtime. The **outputs** differ in two ways that matter:
   tool result with the reason and continues the model from there — so a `redact` outcome on a
   response escalates to a whole-result withhold rather than a partial mask.
 
-!!! warning "`apply_patch` is wired but currently inert"
-    Codex reliably fires `PreToolUse`/`PostToolUse` for `Bash` today, not for `apply_patch`. The
-    matcher and field entries are in place for when it does; until then, file edits made through
-    `apply_patch` are not scanned live. The worktree scan (`aka scan` / the `aka-scan` skill) and
-    the dashboard still cover them after the fact.
+- **A shell command is never masked in place.** Rewriting it would silently change what runs, so
+  a `redact` policy on a `Bash` command follows the `redactFallback` setting in
+  `~/.aka/settings/settings.json`. It ships as **`warn`**: the command runs with the value
+  unmasked and AKA says so in the session. Set it to `block` to deny the call instead.
+  `apply_patch` content is stored text, not a command, so it is always masked in place.
+
+Live scanning covers `Bash` commands and `apply_patch` file writes before they run, and the
+output of shell calls, Codex's web tool and MCP tools after they return — including the tool
+calls a code-mode `exec` makes (confirmed on codex-cli 0.160.0). Web and MCP tool **inputs** are
+not scanned on the way in. A very large tool result is scanned up to a bound (5 million
+characters or 2,000 pieces, and about 7 seconds); the rest reaches the model unscanned, and a
+cut-short scan counts as a fail-open in `aka status`.
+
+!!! note "Older Codex releases"
+    On a Codex release that fires these hooks for `Bash` alone, `apply_patch` content is not
+    scanned at all — live or after the fact. Only the changed paths are recorded.
+
+The full text of every `apply_patch` call is recorded in the local store, with detected values
+masked. Shell commands and tool output are recorded only when something is detected.
+
+The reversible secret vault is not wired for Codex sessions: everything AKA redacts here is
+one-way, and a vault pointer (`[[aka:...]]`) inside a `Bash` command is denied. When vault consent
+was granted by another plugin on the machine, `SessionStart` still injects a brief telling the
+model what a pointer means.
 
 Fail-open is structural, exactly as in Claude Code: on any error the hooks print nothing and
 exit 0, which Codex reads as "allow".
@@ -107,7 +126,7 @@ full payload description and the revocation limits.
 ## Uninstalling
 
 ```bash
-codex plugin uninstall aka-codex@ai-tc
+codex plugin remove aka-codex@ai-tc
 ```
 
 See [Uninstalling](uninstalling.md) for what that does and doesn't clean up.
