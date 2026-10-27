@@ -74,44 +74,67 @@ underneath them:
 
 ```mermaid
 flowchart TD
-    subgraph adapters["Harness adapters"]
-        plugin["plugins/claude-code<br/><small>Hooks for Claude Code / Claude Desktop</small>"]
+    subgraph adapters["Coding-agent plugins"]
+        plugin["plugins/claude-code<br/><small>Hooks + mod for Claude Code / Claude Desktop</small>"]
         codex["plugins/codex<br/><small>Hooks + skills for Codex CLI</small>"]
         antigravity["plugins/antigravity<br/><small>Hooks + skills for the agy CLI</small>"]
-        browser["plugins/browser-extension<br/><small>Chrome MV3 + native host — ChatGPT / Claude.ai</small>"]
+        copilot["plugins/copilot<br/><small>Hooks for Copilot CLI / VS Code</small>"]
+    end
+
+    browser["plugins/browser-extension<br/><small>Chrome MV3 + native host — ChatGPT / Claude.ai</small>"]
+
+    subgraph apps["Local apps"]
         cli["cli<br/><small>The aka CLI</small>"]
         webui["web-ui<br/><small>OSS Next.js dashboard</small>"]
     end
 
     subgraph runtime["Shared runtime"]
-        pluginRuntime["packages/plugin-runtime<br/><small>Hook wiring the plugin runs on</small>"]
-        sdk["packages/plugin-sdk<br/><small>Adapter interface + runtime lifecycle</small>"]
+        scanner["packages/scanner<br/><small>Working-tree scan behind /aka:scan</small>"]
+        wizard["packages/setup-wizard<br/><small>Harness-agnostic /aka:setup core</small>"]
+        pluginRuntime["packages/plugin-runtime<br/><small>Standalone + attached DataGateway</small>"]
+        sdk["packages/plugin-sdk<br/><small>Adapter interface, runtime, bundled packs</small>"]
+        localOps["packages/local-ops<br/><small>Updates, fs scan, Data Shares forward</small>"]
+        remote["packages/remote<br/><small>Control-plane transport — the only socket</small>"]
         detections["packages/detections<br/><small>Pure detection engine — scan + redact</small>"]
         persistence["packages/persistence<br/><small>Local SQLite store adapter</small>"]
         schema["packages/schema<br/><small>Zod contracts — single source of truth</small>"]
     end
 
+    subgraph ui["Dashboard UI"]
+        dashboardUi["packages/dashboard-ui<br/><small>Shared React views</small>"]
+        uiKit["packages/ui-kit<br/><small>UI primitives</small>"]
+    end
+
     rules["rules/<br/><small>Detection rule packs</small>"]
 
-    plugin --> pluginRuntime
-    plugin --> sdk
-    codex --> pluginRuntime
-    codex --> sdk
-    antigravity --> pluginRuntime
-    antigravity --> sdk
-    browser --> sdk
+    adapters --> scanner
+    adapters --> wizard
+    adapters --> pluginRuntime
+    browser --> pluginRuntime
+    scanner --> pluginRuntime
+    scanner --> sdk
+    wizard --> sdk
     pluginRuntime --> sdk
+    pluginRuntime --> remote
     pluginRuntime --> persistence
-    pluginRuntime --> schema
     sdk --> detections
     sdk --> persistence
-    cli --> persistence
-    webui --> persistence
-    detections -->|loads| rules
+    rules -.->|bundled at build time| sdk
+    cli --> pluginRuntime
+    cli --> localOps
+    webui --> localOps
+    webui --> remote
+    webui --> dashboardUi
+    localOps --> sdk
+    dashboardUi --> uiKit
     detections --> schema
     persistence --> schema
-    sdk --> schema
+    remote --> schema
 ```
+
+Every package also depends on `packages/schema`; only the edges that carry behaviour are drawn.
+`detections` uses `packages/extract` (CSV) for tabular scanning, and `cli` bundles the browser
+extension and `web-ui` into its published package.
 
 `cli` and `web-ui` read/write `packages/persistence` directly; the harness plugins go through
 `packages/plugin-runtime` and `packages/plugin-sdk`, since that's the layer that also owns the
