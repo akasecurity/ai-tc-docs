@@ -17,7 +17,7 @@ This page walks the whole flow once, end-to-end.
 !!! info "The security model"
     An exception **never stores the approved value**. What is kept is a **keyed fingerprint** (an HMAC under a machine-local key) plus a masked preview for display — the store can _recognize_ the exact value when it appears again, but the value cannot be recovered from anything on disk. 
     
-    Grants are **exact-value**: excepting one sandbox key does not loosen the rule, and a different key — even one character off — is still blocked. And creation is deliberately out-of-band: only the CLI, run by a human at a terminal, can grant one; nothing model-invocable can approve its own bypass.
+    Grants are **exact-value**: excepting one sandbox key does not loosen the rule, and a different key — even one character off — is still blocked. And creation is deliberately out-of-band: only a human at a terminal (`aka exception`) or in the local dashboard (**Exceptions**) can grant one; nothing model-invocable can approve its own bypass.
 
 ---
 
@@ -72,15 +72,21 @@ The command asks two questions.
 
 **Scope** is how long the grant lives. There is no default. Pick the narrowest scope that solves your problem.
 
-| Scope       | Meaning                                      |
-| ----------- | -------------------------------------------- |
-| `once`      | exactly one use, then the grant is spent     |
-| `temporary` | expires after a duration (e.g. 30m, 1h, 24h) |
-| `permanent` | until you revoke it                          |
+| Scope       | Flag                  | Meaning                                                                |
+| ----------- | --------------------- | ---------------------------------------------------------------------- |
+| `once`      | `--once`              | one use, then the grant is spent; expires after 30 minutes regardless  |
+| `temporary` | `--for 30m\|1h\|24h`  | expires after that duration — those three values only, 24 hours at most |
+| `permanent` | `--permanent`         | until you revoke it; you confirm by typing the masked value back       |
 
 ### Reason for the exception
 
-The **Reason** describes a short justification and is required. It is the audit trail that ensures six weeks from now you won't forget why you made the exception.
+The **Reason** describes a short justification and is required. It is the audit trail that ensures six weeks from now you won't forget why you made the exception. `--method acknowledged|false-positive|test-or-example` adds the reason as a label.
+
+### From the dashboard
+
+The local dashboard's **Exceptions** page does the same out-of-band: approve a recently blocked
+row, or **pre-authorize** a value that wasn't just blocked (the web twin of
+`aka exception add`). It also lists, revokes, and rotates the key.
 
 ## 3. Resubmit
 
