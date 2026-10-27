@@ -8,30 +8,28 @@ the OSS web-ui. AKA also has a separate enterprise control plane for teams.
 ```
 ai-tc/
 ├── plugins/
-│   ├── claude-code/         Hooks for Claude Code and Claude Desktop
+│   ├── claude-code/         Hooks + mod for Claude Code and Claude Desktop
 │   ├── codex/               Hooks + skills for Codex CLI
 │   ├── antigravity/         Hooks + skills for the Antigravity (`agy`) CLI
+│   ├── copilot/             Hooks for GitHub Copilot CLI and VS Code agent mode
 │   └── browser-extension/   Chrome MV3 extension + native host for ChatGPT / Claude.ai
-├── cli/                     The `aka` CLI — scan, stats, dashboard, plugin management
+├── cli/                     The `aka` CLI — scan, stats, exceptions, vault, attach, dashboard, updates
 ├── web-ui/                  OSS Next.js dashboard — reads the local store directly
 ├── packages/
 │   ├── schema/           Zod contracts — single source of truth
-│   ├── config/           Env loader — sole reader of process.env
-│   ├── detections/       Pure detection engine (no I/O) — runs identically
-│   │                     everywhere detection happens (plugin, backend)
+│   ├── detections/       Pure detection engine (no I/O) — scan + redact, used by every surface
+│   ├── extract/          Dependency-free content extraction (CSV) for tabular scanning
 │   ├── scanner/          Working-tree file walking/discovery behind `/aka:scan`
-│   ├── persistence/      Local SQLite store adapter — no backend required
-│   ├── plugin-runtime/   Resolves the DataGateway and drives the hook
-│   │                     lifecycle
-│   ├── plugin-sdk/       AkaPluginAdapter interface shared by every harness
-│   ├── client/           Generated API client (sole caller of fetch)
-│   ├── local-ops/        Local-store maintenance — rule-pack update cache, fs scan/render
-│   ├── extract/          Export helpers (CSV, …)
-│   ├── telemetry/        Anonymous usage telemetry SDK
+│   ├── persistence/      Local SQLite store adapter, migrations, secret vault
+│   ├── plugin-sdk/       AkaPluginAdapter interface, plugin runtime, bundled rule packs
+│   ├── plugin-runtime/   Standalone and attached DataGateway; detached sync workers
+│   ├── remote/           Control-plane transport — the one package allowed to open a socket
+│   ├── setup-wizard/     Harness-agnostic core of the `/aka:setup` wizard
+│   ├── local-ops/        CLI/dashboard operations — updates, fs scan, Data Shares forwarding
 │   ├── dashboard-ui/     Shared React views — same components render the OSS
 │   │                     and enterprise dashboards
-│   ├── eslint-config/    Shared flat ESLint config (strict, boundary rules)
-│   └── ui-kit/           Shared low-level UI primitives (buttons, cards, tables, …)
+│   ├── ui-kit/           Shared low-level UI primitives (buttons, cards, tables, …)
+│   └── eslint-config/    Shared flat ESLint config (strict, boundary + no-network rules)
 ├── rules/
 │   ├── core-pii/           PII detections (email, SSN, …) with fixtures
 │   ├── core-financial/     Card numbers, bank routing, … with fixtures
@@ -39,20 +37,20 @@ ai-tc/
 │   ├── core-code-context/  Code-context signals with fixtures
 │   ├── secrets/            Cloud/API credentials with fixtures
 │   ├── secrets-infra/      Infra-specific credentials with fixtures
-│   └── code-flaws/         OWASP-style insecure code patterns with fixtures
+│   ├── code-flaws/         OWASP-style insecure code patterns with fixtures
+│   └── command-risk/       Risky shell commands an agent is about to run, with fixtures
 ├── tools/
 │   ├── installer/        Cross-platform bootstrap script for the `aka` CLI
-│   ├── migrator/         CLI for applying DB migrations
-│   └── rules-publisher/  CLI that publishes rules/ packs to the registry
+│   ├── ci/               CI scripts, including the no-network egress probes
+│   └── *-gate/, package-manifests/   CI gates — audit, CodeQL, coverage, portability, required checks
 └── skills/
-    ├── backend-conventions/SKILL.md
     └── write-detection-rule/SKILL.md
 ```
 
 ## Build & distribution
 
 `plugins/claude-code` and `cli` are built with `tsup`, which inlines every
-`@akasecurity/*` workspace dependency (`noExternal: [/^@akasecurity\//]`) — the published
+`@akasecurity/*` workspace dependency, plus `zod` (`noExternal: [/^@akasecurity\//, 'zod']`) — the published
 package ships with **no runtime `node_modules`** of its own. Only Node itself needs to
 be on the user's `PATH`, since the hooks invoke it directly. The CLI additionally
 bundles the OSS web-ui as a sibling asset (copied in by `prepack`, spawned as its own
