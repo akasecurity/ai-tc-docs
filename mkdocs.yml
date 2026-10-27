@@ -109,6 +109,7 @@ nav:
       - Claude Desktop: plugins/claude-desktop.md
       - Codex CLI: plugins/codex.md
       - Antigravity: plugins/antigravity.md
+      - GitHub Copilot: plugins/copilot.md
       - Browser Extension: plugins/browser-extension.md
       - Uninstalling: plugins/uninstalling.md
   - Detections:
