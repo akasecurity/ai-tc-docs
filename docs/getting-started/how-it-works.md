@@ -70,7 +70,7 @@ before the content reaches the model (prompts, tool inputs) or after it responds
 Every event is scanned against your installed rule packs. 
 
 * Most rules match with **regex** — a pattern shaped like an AWS access key, an email address, a bank routing number — since that covers the majority of secrets and PII, which have a predictable shape. 
-* A smaller set of rules match on **keyword** presence (contextual phrases like "[REDACTED:PII] is"), and some regex matches pass through a **post-match validator** — a Luhn checksum for card numbers, a Shannon-entropy check for high-entropy secrets — to cut down false positives.
+* A smaller set of rules match on **keyword** presence (contextual phrases such as `feature_flag:` or `SELECT * FROM `), and some regex matches pass through a **post-match validator** — a Luhn checksum for card numbers, a Shannon-entropy check for high-entropy secrets — to cut down false positives.
 * Either way, a match becomes a **Finding**: the rule id, category, severity, and matched span, before policy decides what happens to it. 
 
 !!! Tip
