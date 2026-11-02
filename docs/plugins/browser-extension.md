@@ -10,8 +10,9 @@ same rules, and records findings to the same local store — `~/.aka/data/aka.db
 detections sit alongside Claude Code, Codex, and Antigravity ones in `aka findings` and the
 dashboard.
 
-It is a Chrome MV3 extension with a single permission (`nativeMessaging`) and content scripts
-matching:
+It is a Chrome MV3 extension with a single permission (`nativeMessaging`), a toolbar popup, and
+three content scripts (`bridge.js` and a page-world `tap.js` at `document_start`, `content.js` at
+`document_idle`) matching:
 
 - `https://chatgpt.com/*`
 - `https://chat.openai.com/*`
@@ -33,6 +34,25 @@ The extension never talks to a network service. Its only privileged channel is a
 
 Fail-open holds here too: a host that isn't installed, has died, or is wedged is bounded by a
 3-second relay deadline, after which the send proceeds rather than the message silently vanishing.
+The one exception is a message too large to scan within the time limit: it is **not** sent, and
+a banner says so while your text stays in the composer.
+
+A block banner names the `aka exception approve` command, so a user who accepts the risk can
+grant an exception from a terminal — the page itself can't grant one.
+
+### Web-chat capture
+
+Enforcement (block, warn, redact) runs on every machine regardless of consent. *Recording* the
+conversation — each reply with its tool calls and token usage — is a separate grant: turn on
+**web-chat capture** under **Settings** in `aka dashboard`. The popup also names any site whose messages are not being
+checked.
+
+The popup names the claude.ai account a tab is signed in to. `aka extension account --on`
+records each account it sees (its organization id and when it was seen, nothing from the chat)
+so `aka enroll --list-detected` can list them; `aka extension account --off` stops that and
+deletes the record. Both matter on a machine attached as a personal device — see the
+[CLI README](https://github.com/akasecurity/ai-tc/blob/main/cli/README.md#the-browser-extension-chatgpt--claudeai-web-chat)
+for exactly what is and isn't recorded there.
 
 ## Installing
 
@@ -70,8 +90,11 @@ Building from a workspace checkout:
 pnpm --filter @akasecurity/plugin-browser-extension build
 ```
 
-`node` must be on your PATH — Chrome executes the launcher, and the launcher execs Node over the
-host script.
+The standalone `aka` binary (Homebrew, Scoop, installer script) runs the native host itself; the
+npm package runs it under the same Node.js runtime as the CLI. The registration points at the
+link your package manager keeps current, so upgrades keep working — but if you moved or replaced
+a hand-placed `aka`, run `aka extension install` again. `aka extension status` reports a
+registration whose launcher is gone or points at a version other than the current one.
 
 ## Uninstalling
 

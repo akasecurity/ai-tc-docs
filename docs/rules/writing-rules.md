@@ -30,7 +30,7 @@ Every rule file must conform to `specVersion: 1`:
 | `specVersion` | `1`      | Always `1` for now                                                      |
 | `id`          | `string` | Kebab-case path: `pack/rule`. Must match `rules/<pack>/<rule>.json`     |
 | `name`        | `string` | Human-readable label shown in findings                                  |
-| `category`    | enum     | `pii` \| `financial` \| `secret` \| `phi` \| `code_context` \| `custom` |
+| `category`    | enum     | `pii` \| `financial` \| `secret` \| `phi` \| `code_context` \| `code_flaw` \| `custom` \| `config` |
 | `severity`    | enum     | `critical` \| `high` \| `medium` \| `low`                               |
 | `matcher`     | object   | How to detect — see below                                               |
 
@@ -39,8 +39,13 @@ Every rule file must conform to `specVersion: 1`:
 | Field            | Type                            | Description                                                                                                                                                                                                                                                                                                                                                                      |
 | ---------------- | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `postValidators` | `(string \| {name, config?})[]` | Validators to run after a match (e.g. `"entropy"`, `"luhn"`). The object form passes per-rule config — e.g. `{"name": "entropy", "config": {"minLength": 8, "threshold": 3.0}}` tunes the entropy gate for short password-shaped values (defaults are `minLength: 20`, `threshold: 3.5`, tuned for API keys)                                                                     |
-| `appliesTo`      | `{extensions: string[]}`        | Language/file scoping: run the rule only against text from files with one of these dot-prefixed extensions (e.g. `[".py"]`). When the scanned text has **no** file context (live prompt/response hooks) the rule still runs — pasted code has no knowable language. Use for language-specific APIs (`pickle.loads`, `ObjectInputStream`) to avoid cross-language false positives |
+| `appliesTo`      | `{extensions?: string[], eventKinds?: string[]}` | Scoping; needs at least one of the two. **`extensions`**: run the rule only against text from files with one of these dot-prefixed extensions (e.g. `[".py"]`). When the scanned text has **no** file context (live prompt/response hooks) the rule still runs — pasted code has no knowable language. Use for language-specific APIs (`pickle.loads`, `ObjectInputStream`) to avoid cross-language false positives. **`eventKinds`**: run only on captures of these kinds (`prompt`, `response`, `code_change`, `tool_use`) — and, unlike `extensions`, **never** on text whose kind is unknown (a folder scan, a fixture without one). The `command-risk` pack uses `["tool_use"]` so a document that merely quotes a command never fires |
 | `examples`       | `string[]`                      | Positive examples used in documentation and tooling                                                                                                                                                                                                                                                                                                                              |
+| `requiresNearby` | `{categories?, ruleIds?, labels?, windowChars?, confidenceBoost?}` | Proximity gate: a match is kept only if another match of one of these `categories` or `ruleIds`, or one of these `labels` (case-insensitive text), appears within `windowChars` (default `160`) of it. At least one criterion is required. `confidenceBoost` (0–0.3) nudges a corroborated match's confidence |
+| `evidence`       | `"code"` \| `"value"` | What the matched text is. `value` (a key, a password, an email) is masked everywhere it's shown; `code` (`exec(`, `innerHTML =`) stays readable in a finding's excerpt. Omitted, the engine classifies it; a rule in a value category is always treated as `value` |
+
+!!! warning "Rule objects are strict"
+    An unknown key is a **parse error**, not silently dropped — a typo like `postValidator` fails the rule rather than shipping a guard that never runs. The same goes for an unrecognized `postValidators` name (only `entropy` and `luhn` exist).
 
 ## Matcher types
 
@@ -70,6 +75,10 @@ Matches if any keyword appears in the text. Case-insensitive by default.
 - `pattern`: JavaScript-compatible regex string. Double-escape backslashes in JSON.
 - `flags`: Regex flags string. Default `"gi"`. Common: `"g"` (global), `"gi"` (global + case-insensitive).
 - `captureGroup`: Optional. Which capture group to use as the matched span (0 = full match).
+
+The schema also checks the pattern when the rule loads: the pattern and flags must compile, a
+whole-match pattern that can match the empty string (`\d*`, `a?`) is refused because it can hang
+the matcher, and `captureGroup` must be within the pattern's real group count.
 
 !!! tip "Testing your regex"
 Use [regex101.com](https://regex101.com) with the JavaScript flavour to test patterns before writing the fixture.

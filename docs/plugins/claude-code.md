@@ -20,6 +20,8 @@ plugins/claude-code/
 ├── .claude-plugin/
 │   └── plugin.json      # manifest — ONLY this file goes in .claude-plugin/
 ├── hooks/hooks.json     # hook → script wiring (auto-discovered)
+├── hooks/mod.ts         # in-process mod: prompt redaction, findings band, status line
+├── types/               # type declarations for the mod
 ├── commands/            # /aka:* slash commands (auto-discovered)
 │   ├── setup.md         #   /aka:setup     — onboarding wizard
 │   ├── dashboard.md     #   /aka:dashboard — launch the web dashboard (via the aka CLI)
@@ -29,7 +31,8 @@ plugins/claude-code/
 │   ├── audit.md         #   /aka:audit     — recent enforcement decisions
 │   ├── scan.md          #   /aka:scan      — scan working tree for code flaws
 │   ├── tokens.md        #   /aka:tokens    — token usage + estimated cost
-│   └── exceptions.md    #   /aka:exceptions — active detection exceptions (read-only)
+│   ├── exceptions.md    #   /aka:exceptions — active detection exceptions (read-only)
+│   └── detections.md    #   /aka:detections — installed detection packs (read-only)
 └── scripts/*.js         # built scripts (tsup output, self-contained):
                          #   hooks + query.js (read surface) + dashboard.js + onboard.js
 ```
@@ -39,7 +42,7 @@ The manifest is intentionally minimal. `name` becomes the command namespace, so 
 ```json
 {
   "name": "aka",
-  "version": "0.9.5",
+  "version": "0.9.20",
   "description": "AI Traffic Control — inspect and govern AI prompts in Claude Code. Detection runs locally; events are recorded to a local SQLite store on your machine.",
   "homepage": "https://github.com/akasecurity/ai-tc",
   "author": { "name": "AKA Security" }
@@ -65,15 +68,21 @@ Declared in `hooks/hooks.json` (note: `timeout` is in **seconds**, and commands 
 | Hook               | Matcher                | What AKA does                                                                                                                                         |
 | ------------------ | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SessionStart`     | all sessions           | resolve this machine's inventory (host/harness/account/project), upsert it, and open the session's audit-event root (once per session; emits nothing) |
-| `UserPromptSubmit` | all prompts            | block or warn (Claude Code cannot rewrite prompt text — no redaction)                                                                                 |
-| `PreToolUse`       | `Bash\|Edit\|Write\|WebFetch\|MultiEdit\|NotebookEdit\|Task\|mcp__.*` | deny, **redact via `updatedInput`**, or warn                                        |
-| `PostToolUse`      | `Bash\|Read\|WebFetch` | replace sensitive output via `updatedToolOutput`, or warn                                                                                             |
-| `MessageDisplay`   | every streaming delta  | display-only rewrite of vault pointers via `displayContent` — the transcript and the model's context keep the original text                            |
+| `UserPromptSubmit` | all prompts            | block or warn; a `redact` policy **blocks** here (the mod, when loaded, redacts the prompt in place first — see below)                              |
+| `PreToolUse`       | `Bash\|Edit\|Write\|WebFetch\|WebSearch\|MultiEdit\|NotebookEdit\|Task\|Agent\|mcp__.*` | deny or warn; **redact via `updatedInput`** for text a tool stores — a field that executes follows `redactFallback` |
+| `PreToolUse`       | `Read\|Grep`           | `path-gate.sh`: check whether the path names a credential file (`.env`, a private key, `.netrc`, `credentials*`, `*auth.json`, shell rc files) |
+| `PostToolUse`      | `Bash\|Read\|WebFetch\|Grep\|WebSearch\|Agent\|Task\|mcp__.*` | replace sensitive output via `updatedToolOutput`, or warn — covers WebSearch summaries and links, foreground subagent reports, and `mcp__*` text blocks |
+| `MessageDisplay`   | every streaming delta  | display-only rewrite of vault pointers via `displayContent` — the transcript and the model's context keep the original text (Claude Code **2.1.152+**) |
 | `Stop`             | end of turn            | trigger the background token-usage reconcile worker (spawned detached, so it adds no latency)                                                          |
+| `PreModelSwitch` / `PostModelSwitch` | model changes | refuse a switch onto a model your organization's policy prohibits — enforced only where an attached deployment's policy bundle lists one (Claude Code **2.1.251+**) |
+
+`hooks.json` also loads the plugin's **mod** (`"modules": ["./mod.ts"]`), which runs inside Claude Code
+itself rather than as a hook process. When the host is too old for a version-gated hook above,
+the feature is absent and AKA prints a once-per-session notice at the end of the first turn; `aka status` and `/aka:health` also report it.
 
 ## Hook output contract (Claude Code's, not ours)
 
-Exit code semantics: exit `0` and Claude Code parses stdout JSON; no output means "allow". Fail-open is therefore structural: on any error the hooks print nothing and exit 0.
+Exit code semantics: exit `0` and Claude Code parses stdout JSON; no output means "allow". Fail-open is therefore structural: on any error the hooks print nothing and exit 0. The one exception is a prompt, tool input, or tool output field too large to scan within the hook's time limit — it is blocked, or withheld from the model, rather than passed unscanned.
 
 `UserPromptSubmit`:
 
@@ -90,7 +99,7 @@ Exit code semantics: exit `0` and Claude Code parses stdout JSON; no output mean
 }
 ```
 
-`PreToolUse` (the one surface with true redaction):
+`PreToolUse` (true redaction for text a tool stores):
 
 ```json
 {
@@ -117,9 +126,12 @@ Exit code semantics: exit `0` and Claude Code parses stdout JSON; no output mean
 
 The hooks cannot do everything the warn/redact/block model might imply:
 
-- **Prompt text cannot be rewritten.** `UserPromptSubmit` can only block or warn, so a `redact` policy on the prompt surface degrades to a warning — the content still reaches the model. True redaction works only on tool inputs (`updatedInput`) and outputs (`updatedToolOutput`).
+- **A prompt is redacted in place only by the mod.** The `UserPromptSubmit` hook can only block or warn, so a `redact` policy there **blocks** the prompt, with a message saying what to remove. When the plugin's mod is loaded, it handles the prompt first: each flagged value is replaced with a vault pointer (if you granted vault consent) or `[REDACTED:<CATEGORY>]`, and the prompt goes through. If the mod can't answer in time, the prompt falls through to the hook's block. `aka status` and `/aka:health` say whether prompts are being redacted in place or blocked.
+- **A field that executes is never masked.** Rewriting a shell command, URL, search query, or MCP argument would change what runs, so a `redact` there follows the `redactFallback` setting (`warn` by default; `monitor` or `block` also accepted). Text a tool stores — `Write`/`Edit` content — is masked in place.
 - **Responses are not intercepted inline.** No hook sees the model's reply before the user does. Response capture is **post-hoc**: the `Stop` hook triggers a detached reconcile worker that reads only the transcript bytes appended since the last pass, records findings and token usage from them, and scrubs secret spans in the on-disk transcript in place (Claude Code appends a prompt to `~/.claude/projects/*.jsonl` even when a hook blocked it). `MessageDisplay` can rewrite what the terminal *renders*, but not what the model already produced.
-- **Inline prompt redaction and response interception** are on the roadmap for the future; the plugin is the zero-config developer-experience layer, not the enforcement guarantee.
+- **Response interception** is on the roadmap; the plugin is the zero-config developer-experience layer, not the enforcement guarantee.
+
+The mod also draws a severity-coloured **findings band** above the prompt and a status line, and registers **`/aka:findings-pane`**, which opens this session's findings — with a per-value Show/Hide for vaulted values.
 
 ## Read surface (slash commands)
 
@@ -135,6 +147,7 @@ Findings persist locally to a SQLite store at `~/.aka/data/aka.db`, so the plugi
 | `/aka:tokens`     | token usage per provider/model (reconciled from transcripts) + estimated cost   |
 | `/aka:exceptions` | active detection exceptions — masked value, rule, scope, expiry, uses           |
 | `/aka:detections` | installed detection packs — version, rules, enabled, policy, update available   |
+| `/aka:findings-pane` | this session's findings in a pane (registered by the mod at session start)   |
 
 `/aka:exceptions` is deliberately **read-only**: creating, approving, or revoking an exception happens only out-of-band in a terminal via the `aka` CLI, never from inside a Claude Code session — the session being policed must not be able to grant its own bypass.
 
@@ -177,13 +190,14 @@ For the full graphical view, `/aka:dashboard` launches the OSS web-ui (the same 
 
 ```json
 {
-  "specVersion": 5,
+  "specVersion": 10,
   "runMode": "standalone",
   "policy": "redact",
   "historicalAccess": "session-only",
   "dataSharesInPlace": true,
   "vaultKeyCustody": "file",
   "vaultInlineReveal": "masked",
+  "redactFallback": "warn",
   "onboardedAt": "2026-07-29T...",
   "modelJudgeConsent": {
     "acknowledgedAt": "2026-07-29T...",
@@ -198,9 +212,14 @@ For the full graphical view, `/aka:dashboard` launches the OSS web-ui (the same 
 - **`modelJudgeConsent`** — **absent until granted.** Records that you consented to the `/aka:setup` triage sending findings to the model API to be rated, and the payload shape you agreed to. A consent recorded against an older `payloadVersion` is **stale, and stale reads as revoked** — you are asked again rather than silently held to a grant for a payload you never saw. This is a **distinct** consent from `historicalAccess`, which only governs *reading* local transcripts. Revocable under **Settings → Model-judge consent**; revoking stops future scans but cannot recall data already sent. See [Why the setup scan sends findings to the model](../getting-started/installation.md#why-the-setup-scan-sends-findings-to-the-model).
 - **`vaultConsent`** — **absent until granted.** Consent to keep a *recoverable* encrypted copy of detected values in the local secret vault instead of destroying them. Never an assumed grant on upgrade, because it is a custody change from one-way redaction. Revoking stops future vaulting; it does not erase what is already stored — purging the vault is the eraser.
 - **`vaultKeyCustody`** — where the vault master key lives (`file` default, or `keychain`).
+- **`redactFallback`** — what a `redact` becomes on a field the host can't rewrite (a shell command, URL, search query, or MCP argument): `warn` (default — the call runs and AKA says so), `monitor`, or `block`. An administrator can pin it for a machine.
+- **`historySyncConsent`**, **`sightingShareConsent`** — **absent until granted**; only meaningful on a machine attached to an organization's deployment with `aka attach`. The first covers sending captures recorded before the attachment, or that couldn't be delivered at the time; the second covers sharing credential sightings with the deployment the grant names. `aka detach` clears the sighting grant.
+- **`webChatCapture`** — **absent until answered**; what the [browser extension](browser-extension.md) may record from a web chat. Enforcement does not depend on it.
+- **`bodyRetention`** — local body expiry, off by default (`{"enabled": false, "retainDays": 30}`); `aka prune` applies it. Expiring a body never removes the row or its findings.
+- **`attachmentScope`** — the repositories and accounts a personal-device attachment forwards, written by `aka enroll`.
 - **`vaultInlineReveal`** — how a vault pointer renders in assistant prose: `masked` (default — a `[scrubbed:…]` badge built from descriptor data only, with no de-reference and no audit row), `full` (the real value plus the badge, capped per message), or `off` (display untouched). `masked` is the default because injected content can induce the model to echo every pointer it has seen; under `full` those echoes would render real secrets on screen.
 
-The settings file is **versioned** (`specVersion`): each onboarding step is one more optional field, and an older `settings.json` still parses with the missing key taking its default — so a file written before `historicalAccess` existed loads as `session-only`. v2 added `historicalAccess`, v3 `dataSharesInPlace`, v4 `modelJudgeConsent`, v5 the secret-vault fields.
+The settings file is **versioned** (`specVersion`): each onboarding step is one more optional field, and an older `settings.json` still parses with the missing key taking its default — so a file written before `historicalAccess` existed loads as `session-only`. v2 added `historicalAccess`, v3 `dataSharesInPlace`, v4 `modelJudgeConsent`, v5 the secret-vault fields, v6 `historySyncConsent`, v7 `redactFallback`, v8 `bodyRetention` and `webChatCapture`, v9 `attachmentScope`, v10 `sightingShareConsent`. Nothing re-stamps the version, so an already-onboarded machine keeps the one that first wrote its file.
 
 ### The model-judge egress
 

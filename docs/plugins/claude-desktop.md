@@ -5,7 +5,7 @@ comments: true
 # Claude Desktop Plugin
 
 !!! note
-    Claude Desktop runs the **same plugin package** as Claude Code — `plugins/claude-code`, identical hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`), the same fail-open guarantee, the same local SQLite store (`~/.aka/data/aka.db`), and the same `/aka:*` commands. 
+    Claude Desktop runs the **same plugin package** as Claude Code — `plugins/claude-code`, identical hooks (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `MessageDisplay`, `Stop`, `PreModelSwitch`, `PostModelSwitch`), the same fail-open guarantee, the same local SQLite store (`~/.aka/data/aka.db`), and the same `/aka:*` commands. 
     
     See the [Claude Code plugin guide](claude-code.md) for the full architecture, hook contract, and command reference — this page only covers what's different about running it inside Desktop.
 
@@ -14,8 +14,8 @@ comments: true
 Claude Desktop has no terminal, so plugin management happens in **Settings → Plugins** instead of the `/plugin` slash commands used in the Code CLI:
 
 1. Open **Settings → Plugins**.
-2. **Add marketplace** and enter the marketplace repo: `akasecurity/ai-tc`.
-3. Find **aka** in the installed marketplace's plugin list and click **Install**.
+2. **Add marketplace** and enter the marketplace repo: `akasecurity/marketplace`.
+3. Find **ai-tc** in the installed marketplace's plugin list and click **Install**.
 4. Restart Claude Desktop to load the plugin.
 
 Removing it later? See [Uninstalling](uninstalling.md).

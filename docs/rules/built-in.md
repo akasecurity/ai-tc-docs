@@ -1,8 +1,8 @@
 # Built-in Detections
 
-## Pacakaged Rules
+## Packaged Rules
 
-AKA ships seven rule packs out of the box — **101 detection rules** in total. Every pack is bundled into the plugin and installed active by default, under the log-only **Monitor** policy until you assign a stronger action (Warn / Redact / Block) to a detection from the dashboard. All rules include positive and negative fixtures that run as part of the test suite.
+AKA ships eight rule packs out of the box — **111 detection rules** in total. Every pack is bundled into the plugin and installed active by default. Most start under the log-only **Monitor** policy until you assign a stronger action (Warn / Redact / Vault / Block) to a detection from the dashboard; a pack's manifest can name a different starting policy (`defaultPolicy`), and the `secrets` and `command-risk` packs start on **Warn**. All rules include positive and negative fixtures that run as part of the test suite.
 
 **Pack updates are manual.** The plugin scans with your _installed_ snapshot of each pack (enabled packs only). Upgrading the plugin/CLI records the newer packs as _available_ but changes nothing until you apply the update — from the dashboard's Detections page (**Update**), with `aka detections update`, or after reviewing `/aka:detections` in Claude Code. New packs added in a release are auto-installed (monitor-only); packs you already have are never modified automatically, and your enabled/policy choices survive every update.
 
@@ -50,13 +50,14 @@ Detects financial account information. 8 rules.
 
 **Location:** `rules/secrets/`
 
-Detects credentials and tokens that should never be shared with AI models. 21 rules.
+Detects credentials and tokens that should never be shared with AI models. Starts on **Warn**. 22 rules.
 
 | Rule ID                   | Severity | Matcher | Post-Validators | Description                                                       |
 | ------------------------- | -------- | ------- | --------------- | ----------------------------------------------------------------- |
 | `aws-access-key`          | critical | regex   | `entropy`       | AWS Access Key IDs (AKIA/ASIA/AROA/etc.)                          |
 | `aws-secret-key`          | critical | regex   | `entropy`       | AWS Secret Access Keys (40-char, requires aws-secret-key context) |
-| `gcp-service-account`     | critical | regex   | —               | GCP service account emails                                        |
+| `gcp-service-account-key` | critical | regex   | —               | GCP service account key file (requires nearby key-file context)   |
+| `tailscale-key`           | critical | regex   | —               | Tailscale auth/API/client key                                     |
 | `azure-connection-string` | critical | regex   | —               | Azure Storage/Service Bus/Cosmos connection strings (two keys)    |
 | `openai-api-key`          | critical | regex   | `entropy`       | OpenAI API keys (`sk-proj-...`, `sk-...`)                         |
 | `anthropic-api-key`       | critical | regex   | `entropy`       | Anthropic API keys (`sk-ant-...`)                                 |
@@ -80,7 +81,7 @@ Detects credentials and tokens that should never be shared with AI models. 21 ru
 
 **Location:** `rules/secrets-infra/`
 
-Detects infrastructure-level secrets and credentials. 13 rules.
+Detects infrastructure-level secrets and credentials. 14 rules.
 
 | Rule ID                       | Severity | Matcher | Post-Validators | Description                                              |
 | ----------------------------- | -------- | ------- | --------------- | -------------------------------------------------------- |
@@ -91,8 +92,9 @@ Detects infrastructure-level secrets and credentials. 13 rules.
 | `basic-auth-header`           | critical | regex   | —               | HTTP Basic auth Authorization headers                    |
 | `pgp-private-key`             | critical | regex   | —               | PGP private key blocks                                   |
 | `bearer-token`                | high     | regex   | `entropy`       | Generic Authorization Bearer tokens                      |
-| `env-key-value`               | high     | keyword | —               | Sensitive env vars with values                           |
-| `password-field`              | high     | keyword | —               | JSON/YAML password/secret/token fields                   |
+| `env-key-value`               | high     | regex   | —               | Sensitive env vars with values                           |
+| `password-field`              | high     | regex   | —               | JSON/YAML password/secret/token fields                   |
+| `secret-config-value`         | high     | regex   | —               | Value under a secret-named config key                    |
 | `docker-config-auth`          | critical | regex   | —               | Docker `config.json` base64 auth                         |
 | `kubeconfig-token`            | critical | regex   | —               | Kubernetes kubeconfig embedded tokens                    |
 | `api-key-header`              | high     | regex   | `entropy`       | API keys in `x-api-key`/`api-key`/`apikey` headers       |
@@ -119,7 +121,7 @@ Detects protected health information (HIPAA-relevant). 8 rules.
 
 **Location:** `rules/core-code-context/`
 
-Detects internal code and infrastructure context that should not leave the organization. 8 rules.
+Detects internal code and infrastructure context that should not leave the organization. 9 rules.
 
 | Rule ID           | Severity | Matcher | Description                                         |
 | ----------------- | -------- | ------- | --------------------------------------------------- |
@@ -131,12 +133,13 @@ Detects internal code and infrastructure context that should not leave the organ
 | `internal-url`    | low      | keyword | Dev/staging environment URLs                        |
 | `feature-flag`    | low      | keyword | Feature flag / toggle names                         |
 | `db-table-name`   | low      | keyword | Internal SQL table names                            |
+| `gcp-service-account-email` | low | regex | GCP service account email |
 
 ## code-flaws
 
 **Location:** `rules/code-flaws/`
 
-Detects insecure code patterns across Python, JS/TS, Java, Ruby, PHP, and .NET. Rules fire on both code written by Claude (PreToolUse on `Write`/`Edit`) and existing code read from disk (PostToolUse on `Read`). 29 rules covering OWASP Top 10 and related weaknesses.
+Detects insecure code patterns across Python, JS/TS, Java, Ruby, and PHP. Rules fire on both code written by Claude (PreToolUse on `Write`/`Edit`) and existing code read from disk (PostToolUse on `Read`). 29 rules covering OWASP Top 10 and related weaknesses.
 
 | Rule ID                     | Severity | Matcher | Description                                                                                     |
 | --------------------------- | -------- | ------- | ----------------------------------------------------------------------------------------------- |
@@ -170,6 +173,22 @@ Detects insecure code patterns across Python, JS/TS, Java, Ruby, PHP, and .NET. 
 | `ssrf-user-url`             | high     | regex   | `fetch`/`axios`/`requests.get` called directly with `req.*`/`params.*`                          |
 | `regex-redos-backtrack`     | medium   | regex   | Catastrophic backtracking patterns like `(a+)+`                                                 |
 
+## command-risk
+
+**Location:** `rules/command-risk/`
+
+Flags risky shell commands an agent is about to run — scoped to tool calls (`appliesTo.eventKinds: ["tool_use"]`), so prompts and files are never matched. Starts on **Warn**. 7 rules.
+
+| Rule ID                  | Severity | Matcher | Description                                              |
+| ------------------------ | -------- | ------- | -------------------------------------------------------- |
+| `rm-rf-home-or-shared`   | high     | regex   | Recursive rm of home, /Users or a system directory itself |
+| `git-force-push`         | high     | regex   | git push --force / -f                                    |
+| `git-reset-hard`         | high     | regex   | git reset --hard at command position                     |
+| `curl-pipe-shell`        | high     | regex   | curl/wget piped to a shell                               |
+| `pkill-broad`            | medium   | regex   | pkill -f (command-line pattern kill)                     |
+| `credential-file-read`   | medium   | regex   | Dump of a credential-bearing file                        |
+| `credential-file-access` | medium   | regex   | Read of a credential-bearing file                        |
+
 ## config-posture
 
 Structural rules over the plugin's [configuration-inventory scan](../plugins/claude-code.md#configuration-inventory-scan-skills-hooks) (skills & hooks), evaluated once per session on `SessionStart`. Unlike the text packs above, these compare hook entries against each other, so they live as pure functions in `packages/detections/src/posture/` (fixture-tested like every pack) rather than in the regex rule format. Findings are observational (`warn`) and power the hook status/warning lines on the config read surface.
@@ -179,6 +198,7 @@ Structural rules over the plugin's [configuration-inventory scan](../plugins/cla
 | `hook-conflict`        | medium   | Two hooks on the same event with overlapping matchers both mutate the tool target — run order is undefined     |
 | `hook-unknown`         | medium   | A settings-scope hook's command is attributable to no installed plugin and no recognizable tool (v1 heuristic) |
 | `hook-external-egress` | high     | A hook command contains network-egress primitives (`curl`, `wget`, `nc`, `ssh`, …) or a URL                    |
+| `web-capture-drift`    | medium   | The browser extension reports that a web-chat site's network capture went blind or degraded (the site changed and the parser no longer reads it) — derived, not persisted; shown on the dashboard's Security and Findings pages |
 
 ## Running the test suite
 
