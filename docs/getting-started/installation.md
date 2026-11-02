@@ -25,19 +25,21 @@ comments: true
 
     1. Open **Settings → Plugins**.
     2. **Add marketplace** and enter `akasecurity/marketplace`.
-    3. Find **aka** in the list and click **Install**.
+    3. Find **ai-tc** in the list and click **Install**.
     4. Restart Claude Desktop.
 
     See the [Claude Desktop plugin guide](../plugins/claude-desktop.md) for the full walkthrough.
 
 === "Codex CLI"
 
-    Codex resolves the plugin from this repo's own marketplace file:
+    Codex resolves the plugin from the `akasecurity/ai-tc` repo's own marketplace file:
 
     ```bash
     codex plugin marketplace add akasecurity/ai-tc
-    codex plugin install aka-codex@ai-tc
+    codex plugin add aka-codex@ai-tc
     ```
+
+    Codex has no `plugin install` verb — `add` both installs and updates.
 
     Restart Codex afterwards. See the [Codex plugin guide](../plugins/codex.md) for the hook
     contract and the skill-based read surface.
@@ -57,6 +59,21 @@ comments: true
     [Known limitations](../plugins/antigravity.md#known-limitations) before relying on it for
     enforcement.
 
+=== "GitHub Copilot"
+
+    Copilot installs from an unpacked copy of the npm package. Keep the folder — updates come
+    from it:
+
+    ```bash
+    mkdir -p aka-copilot && cd aka-copilot
+    tar -xzf "$(npm pack @akasecurity/ai-tc-copilot --silent)"
+    copilot plugin install ./package
+    aka init
+    ```
+
+    Only shell commands can be blocked on this host, and VS Code agent mode is beta — see the
+    [Copilot plugin guide](../plugins/copilot.md).
+
 === "Browser (ChatGPT / Claude.ai)"
 
     Web chat is covered by a Chrome extension plus a local native-messaging host:
@@ -70,12 +87,57 @@ comments: true
 
 !!! tip "Already have the `aka` CLI?"
     `aka plugins list` shows every supported agent and whether it's installed, and
-    `aka plugins install <agent>` (`claude-code`, `codex`, `antigravity`) runs the host's own
-    plugin manager for you. Every plugin writes the same local store, so mixing agents just means
+    `aka plugins install <agent>` (`claude-code`, `codex`, `antigravity`, `copilot`) runs the host's own
+    plugin manager for you, or prints the steps for hosts that install from a local directory. Every plugin writes the same local store, so mixing agents just means
     more of your activity lands in one findings history.
 
-!!! note "Coming soon"
-    **Homebrew** and **npm** installation options are coming soon.
+## Install the `aka` CLI
+
+The plugins work without it, but the `aka` CLI adds [scanning, stats, exceptions, updates, and
+the dashboard](cli.md). Pick one channel:
+
+=== "npm"
+
+    ```bash
+    npm install -g @akasecurity/cli
+    ```
+
+    Requires **Node.js 24+** (the CLI uses the built-in `node:sqlite`). This is also the only
+    option on Intel macOS, which has no standalone binary build.
+
+=== "Homebrew (macOS / Linux)"
+
+    ```bash
+    brew install akasecurity/tap/aka
+    ```
+
+    A self-contained binary — no Node.js needed.
+
+=== "Scoop (Windows)"
+
+    ```powershell
+    scoop bucket add akasecurity https://github.com/akasecurity/scoop-bucket
+    scoop install aka
+    ```
+
+=== "Installer script"
+
+    ```bash
+    # macOS / Linux
+    curl -fsSL https://raw.githubusercontent.com/akasecurity/ai-tc/bin-latest/tools/installer/install.sh | sh
+    ```
+
+    ```powershell
+    # Windows (PowerShell)
+    irm https://raw.githubusercontent.com/akasecurity/ai-tc/bin-latest/tools/installer/install.ps1 | iex
+    ```
+
+    Downloads the same standalone binary archive Homebrew and Scoop use. Direct archive
+    downloads, `SHA256SUMS`, and build-provenance verification are described in the
+    [installer README](https://github.com/akasecurity/ai-tc/blob/main/tools/installer/README.md).
+
+Then run `aka init` to create the local store. Upgrade the same way you installed — see
+[Updates](updates.md).
 
 ## Onboard
 
@@ -86,7 +148,9 @@ Inside a session, run the onboarding wizard:
 ```
 
 On Codex and Antigravity there is no `/aka:*` command namespace — the same wizard ships as the
-**`aka-setup` skill**; ask for it by name in the session.
+**`aka-setup` skill**; ask for it by name in the session. GitHub Copilot has no calibration
+wizard yet — its `aka-setup` skill only explains what that host can enforce, so configure it
+with the `aka` CLI.
 
 The wizard calibrates AKA from your *actual* activity rather than a demo profile: it
 offers one retroactive scan of the last 30 days of Claude history, reports the real
@@ -159,9 +223,9 @@ AKA asks again rather than holding you to terms you never saw.
 
 ## Verify it's working
 
-Submit a prompt containing a fake credential — the same shape a real secrets rule would match — and confirm AKA blocks it. See the fixtures in `rules/secrets/` for a concrete example payload.
+Submit a prompt containing a fake credential — the same shape a real secrets rule would match. See the fixtures in `rules/secrets/` for a concrete example payload.
 
-You should see a block message referencing `secrets/aws-access-key`. Then run `/aka:findings` or `/aka:health` to see it recorded.
+On a new install the secrets pack starts on **warn**, so you should see `AKA flagged sensitive content (secrets/aws-access-key) — sent unchanged.` Promote the detection to block from the dashboard to stop it instead. Then run `/aka:findings` or `/aka:health` to see it recorded.
 
 ## Open the dashboard
 
@@ -169,7 +233,7 @@ You should see a block message referencing `secrets/aws-access-key`. Then run `/
 /aka:dashboard
 ```
 
-Navigate to `http://localhost:4319/security` to see the Events page.
+Navigate to `http://localhost:4319/security` to see the Security page.
 
 ## What's next
 
@@ -177,4 +241,4 @@ Navigate to `http://localhost:4319/security` to see the Events page.
 - Use [the `aka` CLI](cli.md) for scanning, stats, and managing detection packs
 - Per-host hook internals and configuration details: [Claude Code](../plugins/claude-code.md),
   [Claude Desktop](../plugins/claude-desktop.md), [Codex CLI](../plugins/codex.md),
-  [Antigravity](../plugins/antigravity.md), [browser extension](../plugins/browser-extension.md)
+  [Antigravity](../plugins/antigravity.md), [GitHub Copilot](../plugins/copilot.md), [browser extension](../plugins/browser-extension.md)

@@ -1,4 +1,9 @@
-# AKA AI-TC — Docs
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/readme/strip-dark.svg">
+  <img src=".github/readme/strip-light.svg" alt="The documentation site for AI Traffic Control, AKA Security's guardrails for coding agents." width="100%">
+</picture>
+
+# AKA AI-TC docs
 
 Public documentation for [AKA AI-TC](https://github.com/akasecurity/ai-tc) (AI Traffic Control), an open-source control plane that intercepts, inspects, and governs AI prompts and responses.
 

@@ -77,9 +77,12 @@ be described as covered:
   common fields, but no prompt text, and its output can only *add* steps. A secret pasted into a
   prompt reaches the model; AKA records it (so it appears in findings and the dashboard) but
   cannot stop it. This is the single biggest difference from the Claude Code plugin.
-- **A `redact` policy denies instead of masking.** `PreToolUse`'s output is
-  `{ decision, reason, permissionOverrides }` with no field for modified arguments, so AKA denies
-  the tool call and explains what to remove. This applies to file writes as well as shell commands.
+- **A `redact` policy cannot mask; what happens instead is a setting.** `PreToolUse`'s output is
+  `{ decision, reason, permissionOverrides }` with no field for modified arguments, so a redact
+  follows the `redactFallback` setting in `~/.aka/settings/settings.json`. It ships as **`warn`**:
+  the tool call **runs with the value unmasked**, and the warning appears only in findings and
+  the dashboard. Set it to `block` to deny the call and explain what to remove. This applies to
+  file writes as well as shell commands.
 - **A `warn` is recorded but not shown inline.** `PreToolUse` has no message channel (its `reason`
   accompanies a deny), so warns are ledgered silently — see them via `aka-findings` or the
   dashboard.
@@ -91,23 +94,39 @@ be described as covered:
 - **`multi_replace_file_content` is not scanned.** Its arguments nest edits in an undocumented
   container, so AKA does not guess at the shape. `write_to_file`, `replace_file_content`, and
   `run_command` are scanned.
+- **A stuck hook denies the call, and it won't look like AKA.** AKA's hooks always print an
+  explicit allow, including on their own 8-second watchdog, but a hook blocked by a heavily
+  contended store can be killed by Antigravity's 10-second timeout first. You'll see "Tool call
+  denied by &lt;hook&gt;" with no AKA reason; retrying usually succeeds.
+- **If hooks never fire,** the likely cause is `${PLUGIN_ROOT}`, which Antigravity doesn't
+  document. Each command falls back to `~/.gemini/config/plugins/aka-antigravity`; if the plugin
+  is installed elsewhere, edit `hooks.json` and replace `${PLUGIN_ROOT:-…}` with the absolute path.
+- **On `agy` older than 1.1.10, the `Stop` hook never runs**, and `/hooks` didn't list
+  plugin-bundled hooks until 1.2.3. Capture still happens; the tail of a turn is reconciled on the
+  next turn instead.
+- **The reversible secret vault is not wired** for Antigravity sessions — everything AKA redacts
+  here is one-way.
 - **Historical scanning reads transcripts, not tool arguments.** Past prompts and model messages
   *are* found by the backfill; a secret sitting in a past `run_command` line or `write_to_file`
   body is not (the live `PreToolUse` hook does scan those, so this gap is about past sessions).
 
 ## Onboarding and the model-judge egress
 
-`aka-setup` runs the same calibration wizard with the same two consents, but this host's egress is
-weaker than Claude Code's and Codex's in three named ways, all of which the wizard states before
+`aka-setup` runs the same calibration wizard with the same two consents, but this host's egress
+differs from Claude Code's and Codex's in these named ways, all of which the wizard states before
 asking for consent:
 
 - **The `agy` CLI documents no ephemeral mode.** Every run is written to the conversation store
   under `~/.gemini/antigravity/brain/` — raw values and all — so AKA deletes the judge's own
   conversation itself when the run ends. That deletion is best-effort: a process killed between
   the write and the cleanup leaves the conversation on disk.
-- **The prompt travels on the command line**, because `agy` documents no way to read a prompt from
-  stdin. For the life of each run, raw values are visible to anything that can list processes on
-  the machine.
+- **The judge needs an `agy` with the streaming stdin interface.** It runs
+  `agy --input-format stream-json --output-format stream-json` and writes the prompt to standard
+  input rather than the command line. An older `agy` that rejects those flags fails the step with
+  `agy judge subprocess failed`; calibration questions, the historical read and local detection
+  are unaffected.
+- **On Windows, a stalled model call may not be bounded.** Where `agy` is the `agy.cmd` shim, the
+  180-second limit applies to `cmd.exe`, not the `agy` process it starts.
 - **Deleting the conversation is not network isolation.** It is a local-write cleanup; it cannot
   recall what was already sent.
 

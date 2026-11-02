@@ -15,28 +15,40 @@ What you get:
 - `aka init` — scaffold your local AKA home (settings + local database)
 - `aka scan [path]` — scan a file or directory and record findings (default: `.`)
 - `aka stats` — print findings / enforcement / detections from the local store
-- `aka detections [update]` — list installed detection packs + apply updates (manual)
-- `aka plugins` — list / install agent plugins (Claude Code, …)
+- `aka detections [update|unquarantine]` — list installed detection packs, apply updates (manual), clear quarantined rules
+- `aka plugins` — list / install agent plugins (Claude Code, Codex, Antigravity, GitHub Copilot)
 - `aka dashboard` — launch the local web dashboard and open it in your browser
+- `aka extension` — install / check the browser extension's native-messaging host (`install`, `status`, `account`)
 - `aka exception` — manage detection exceptions (`approve`, `add`, `list`, `show`, `revoke`, `rotate-key`)
-- `aka vault [show]` — reveal a vaulted secret by its pointer (every reveal is audited)
+- `aka vault [show|prune]` — reveal a vaulted secret by its pointer (every reveal is audited), or undo vaulting the policy no longer allows
+- `aka attach` / `aka detach` / `aka status` — register this machine with your organization's AKA deployment, stop, or show what it's attached to
+- `aka enroll` / `aka unenroll` — choose which repositories and accounts a personal-device attachment sends
+- `aka sync-history` — whether to send activity recorded before this machine attached
 - `aka tui [view]` — interactive terminal dashboard (`health`, `findings`, `recommend`, `audit`)
 - `aka check-updates` — show which components (CLI + plugins) have updates available
 - `aka update [what]` — update the CLI and/or plugins (`cli`, `<plugin-id>`, `all`)
 - `aka completion <zsh|bash>` — emit a shell completion script
 - `aka --version` — print the installed CLI version
 
-Global flags, honored for every command:
+Global flags:
 
-- `--home <dir>` — use an alternate AKA home (default: `~/.aka`)
+- `--home <dir>` — use an alternate AKA home (default: `~/.aka`). Accepted by every command
+  except `aka dashboard`.
 - `--no-update-check` — skip the post-command "updates available" notice
+- `-v, --version` / `-h, --help`
+
+On macOS and Linux, any other command runs an external `aka-<command>` from your `PATH` — so
+`aka claude` runs `aka-claude`. A built-in command always wins.
 
 ---
 
 ## Install
 
 The `aka` CLI ships as a **self-contained binary** that embeds its own Node runtime — no
-Node.js, no npm, no native dependencies:
+Node.js, no npm, no native dependencies — through Homebrew (`brew install akasecurity/tap/aka`),
+Scoop (`scoop install aka` after adding the `akasecurity` bucket), or the bootstrap installer.
+It's also on npm as `@akasecurity/cli`. See [Installation](installation.md#install-the-aka-cli)
+for every channel. The installer one-liner:
 
 ```bash
 # macOS / Linux
@@ -57,12 +69,8 @@ instead, set `AKA_INSTALL_REF=bin-v<version>` before running the line.
 - **npm install (`@akasecurity/cli`):** **Node.js 24+** — the CLI uses the built-in
   `node:sqlite` (no native dependency), and the repo tracks the Active LTS line. Install
   from [nodejs.org](https://nodejs.org) or a version manager (`fnm`, `nvm`, `volta`).
-  Check with `node --version`.
-- **A GitHub token with `read:packages`** — **only while AKA is pre-release**, and only
-  for the npm path. The package is published to **private GitHub Packages** during
-  stealth, so installing it needs authentication. This requirement goes away when the
-  project is public. See
-  [Authenticating to GitHub Packages](../plugins/claude-code.md#distribution-marketplace-npm).
+  Check with `node --version`. The package is public on the npm registry — no token needed.
+  Intel macOS has no binary build, so npm is the install path there.
 
 ---
 
@@ -79,23 +87,38 @@ This scaffolds your local AKA home (owner-only `~/.aka`):
 - `~/.aka/data/aka.db` — the local SQLite store (created, migrated, and seeded with the
   default per-category detection policies).
 
-`aka init` is idempotent — run it as often as you like.
+`aka init` is idempotent — run it as often as you like. It also checks for the Claude Code
+plugin and offers to install it; pass `--yes` (`-y`) to accept without a prompt.
 
 ## Scan for secrets & sensitive data
 
 ```bash
-# Scan a directory (skips node_modules, ANY dot-directory, build output, files > 1 MB)
-aka scan .
-
-# Scan a single file (no skip rules — works even for dot-dirs like ~/.aws, ~/.ssh)
-aka scan path/to/file.env
-aka scan ~/.aws/credentials
+aka scan .                          # scan a directory
+aka scan path/to/file.env           # scan a single file
+aka scan . --format json            # machine-readable result on stdout
+aka scan . --fail-on high           # exit 1 if any finding is high or critical
+aka scan . --no-forward             # attached machines: record locally only
 ```
 
-A recursive `aka scan .` skips **every hidden (dot-)directory** — `.git`, but also
-`.github`, `.aws`, `.ssh`, `.config`, … — so it won't descend into them. To sweep a
-dot-directory, point `aka scan` **directly** at the file or folder (the single-path
-form has no skip rules).
+A recursive scan skips build output, vendored code and tool caches (`node_modules`, `dist`,
+`build`, `coverage`, `.git`, `.cache`, …) and files over 1 MB. Other dot-directories **are**
+entered — except directly under your home directory. Two ignore files control the rest:
+
+- **`.akaignore`** (gitignore syntax, any directory level) is a hard skip: matching files are
+  never read and produce no findings. A `!` negation re-includes a directory from the default
+  skip list.
+- **`.gitignore`**d files are still scanned — generated config is a common hiding place for real
+  secrets — but their findings are marked as gitignored.
+
+Some paths are **never** scanned, whatever the ignore files say: `~/.claude/.credentials.json`,
+`~/.claude/ide`, `~/.codex/auth.json`, and the AKA home itself. Pointing `aka scan` at one fails
+with `refusing to scan <path>: it holds credentials this scanner must never read`.
+
+`--format text|json` picks the output. JSON findings carry the masked match, its span and the
+variable it is assigned to — never the raw secret — plus the `inventory`, `egress` and `forward`
+results. `--fail-on <critical|high|medium|low>` is for CI. On a machine attached with
+`aka attach`, a scan also forwards its Data Shares register and credential sightings to that
+deployment; `--no-forward` skips both for one run.
 
 !!! tip
     Findings are recorded into the local store. **Raw secrets never touch disk** — the store keeps only a masked preview of the match and a redacted copy of the file content.
@@ -105,12 +128,13 @@ form has no skip rules).
 
 ```bash
 aka stats              # findings by severity, enforcement actions, latest findings
-aka stats --range 7d   # windows ONLY the enforcement section
+aka stats --range 30d  # window the enforcement and token-usage sections
 ```
 
-`--range` accepts `7d | 30d | 3m | 6m` and scopes **only** the enforcement aggregates —
+`aka stats` also reports token usage and estimated cost. `--range` accepts
+`7d | 30d | 3m | 6m` (default `7d`) and scopes the enforcement and token-usage sections —
 findings-by-severity and the latest findings are always all-time. An unrecognized value
-silently falls back to `30d` (it doesn't error).
+silently falls back to `7d` (it doesn't error).
 
 ## Manage detection packs
 
@@ -118,18 +142,26 @@ silently falls back to `30d` (it doesn't error).
 aka detections                    # list installed packs + available updates
 aka detections update --all       # apply every pending update
 aka detections update <pack-id>   # apply one (accepts `secrets` or `aka/secrets`)
+aka detections unquarantine       # clear cached ReDoS-quarantine verdicts
 ```
 
 `aka detections` prints one row per installed pack: installed version, the latest
 version this CLI ships, rule count, enabled state, assigned enforcement policy,
-and whether an update is available.
+and whether an update is available. It also warns about quarantined rules and invalid rules
+under enabled packs.
+
+A regex rule that blows the ReDoS timing budget, or has to be stopped mid-scan, is
+**quarantined** — cached as unsafe and dropped from later scans. That is a wall-clock judgement,
+so a loaded machine can reach it about a rule that is fine; `aka detections unquarantine` clears
+the verdicts.
 
 Detection updates are **manual by design**. Upgrading the CLI or plugin only
 records what's newly _available_ — the packs you have installed keep running
 unchanged (same rules, same versions) until you apply the update yourself with
 `aka detections update` or the dashboard's **Update** button. `aka init` and the
 plugin's session hooks install packs you don't have yet (new packs arrive
-enabled under the log-only _monitor_ policy), but they **never modify** an
+enabled under the policy their manifest names — the `secrets` and `command-risk` packs ship on
+_warn_ — or the per-category default otherwise), but they **never modify** an
 installed pack; your enabled/disabled choices and policy assignments always
 survive an update.
 
@@ -162,9 +194,9 @@ run under a pipe or in CI.
 ## Manage exceptions
 
 An exception is a deliberate, audited carve-out that lets one specific value through a
-rule that would otherwise catch it. Granting one is only available out-of-band from the
-CLI — never from inside an agent session, so a compromised session can't grant itself a
-bypass.
+rule that would otherwise catch it. Granting one happens only out-of-band — from the CLI or the
+local dashboard's **Exceptions** page — never from inside an agent session, so a compromised
+session can't grant itself a bypass.
 
 ```bash
 aka exception list                  # active grants
@@ -173,8 +205,16 @@ aka exception show 3f2a91           # full detail (an unambiguous id prefix is e
 aka exception revoke 3f2a91 --reason "no longer needed"
 ```
 
-Every grant needs a scope — exactly one of `--once`, `--for <30m|1h|24h>`, or
-`--permanent` — plus a `--reason` (you're prompted for it on a terminal if you omit it).
+Every grant needs a scope — exactly one of:
+
+- `--once` — single use, with a 30-minute backstop expiry
+- `--for <30m|1h|24h>` — time-limited, 24 hours at most
+- `--permanent` — until revoked; you confirm by typing the masked value back (or pass `--yes`
+  when there's no terminal)
+
+— plus a `--reason` (you're prompted for it on a terminal if you omit it). `--method
+<acknowledged|false-positive|test-or-example>` records the reason as a label, and `--yes`
+skips confirmations for non-interactive use.
 
 ```bash
 # Approve something blocked in the last 30 minutes, by the reference in the block message
@@ -182,7 +222,14 @@ aka exception approve 3f2a --for 1h --reason "temp deploy creds"
 
 # Pre-authorize a value that wasn't just blocked
 aka exception add --rule secrets/aws-access-key --stdin --once --reason "rotating today" < key.txt
+
+# Let the model receive a vaulted value's raw form while the grant is active
+aka exception approve '[[aka:secret:...]]' --reveal-to-model --for 1h --reason "agent needs the live key"
 ```
+
+A vault pointer as the selector requires `--reveal-to-model` (`--reveal` for short): instead of
+suppressing a detection, the grant lets the raw value cross tool boundaries, with every crossing
+audited.
 
 !!! warning "The value is never an argument"
     `aka exception add` will **not** accept the secret on the command line — pipe it with
@@ -214,6 +261,21 @@ it may be forged or tampered, its entry may have been purged, or the vault key m
 may be unavailable. The vault doesn't say which — a token nobody can vouch for resolves
 to nothing.
 
+### Undo vaulting the policy no longer allows
+
+A detection assigned Monitor or Warn may only log a match. If you lower a detection's policy,
+entries vaulted under the stronger assignment are out of policy:
+
+```bash
+aka vault prune            # dry run (default): show what would change
+aka vault prune --apply    # restore the transcripts' pointers, then delete those entries
+```
+
+It restores the transcript pointers to their raw values **first** and deletes the vault
+entries only afterwards — the vault holds the only copy. Entries you asked for yourself (the
+Redact button on a surfaced secret) are left alone. `--user-home <dir>` points it at the OS
+home whose `~/.claude/projects` holds the transcripts.
+
 ## Install agent plugins
 
 The CLI is an optional **hub** for installing agent plugins — but each plugin also
@@ -229,10 +291,73 @@ aka plugins install claude-code  # install / set up an agent plugin
   and installs the plugin by delegating to the `claude` CLI's plugin manager, then
   reminds you to restart Claude Code and run `aka init`. If the `claude` CLI isn't on
   your `PATH`, it falls back to printing the in-app `/plugin` commands to run instead.
-- Other agents (Cursor, GitHub Copilot, …) appear as **coming soon** until they ship.
+- **Codex CLI** installs the same way through the `codex` CLI (`codex plugin marketplace add
+  akasecurity/ai-tc`, then `codex plugin add aka-codex@ai-tc`).
+- **Antigravity** and **GitHub Copilot** install from a local directory rather than a
+  marketplace, so `aka plugins install antigravity` / `copilot` prints the steps instead of
+  running them.
+- A Claude Code plugin your organization's managed settings installed is left alone — the CLI
+  refuses to install over it.
 
 `aka plugins list` is read-only — it will **not** create a local store if you haven't
 run `aka init` yet.
+
+## Attach to your organization's deployment
+
+By default AKA is standalone. If your organization runs an AKA deployment, `aka attach`
+registers this machine with it:
+
+```bash
+aka attach --url https://aka.example.com            # prompts for the access key
+aka attach --url https://aka.example.com --scoped   # a personal device
+aka status                                          # what this machine is attached to
+aka detach                                          # stop reporting; record locally only
+```
+
+The access key is never a command-line argument — you're prompted for it, or a browser
+approval flow is offered, or pipe it with `--key-stdin`. `--label <name>` names the deployment
+on screen.
+
+- **`--machine`** — a machine your organization owns: activity from anywhere on it is sent.
+- **`--scoped`** — a personal device: only activity from repositories and accounts you enroll,
+  and from Claude Code and Codex sessions signed in to a recognised work subscription.
+
+On a scoped attachment, choose what's sent:
+
+```bash
+aka enroll                      # the repository this directory is in
+aka enroll --repo github.com/acme/payments-api
+aka enroll --account <key>      # a Claude account or ChatGPT workspace, as --list-detected shows it
+aka enroll --list               # what is enrolled
+aka enroll --list-detected      # web-chat accounts the extension saw, and Claude Code / Codex logins
+aka unenroll --repo github.com/acme/payments-api
+```
+
+Enrolling changes local settings only and contacts nothing. Activity recorded **before** the
+attachment is a separate grant:
+
+```bash
+aka sync-history          # what's in force
+aka sync-history --on     # send it, in the background over later sessions
+aka sync-history --off    # don't; stops anything not already sent
+```
+
+`aka attach --sync-history` / `--no-sync-history` answers the same question up front. An
+attached machine sends more than activity, and what has been sent cannot be recalled —
+[SECURITY.md](https://github.com/akasecurity/ai-tc/blob/main/SECURITY.md#data-in-transit) sets
+out exactly what each mode sends.
+
+## Expire captured bodies
+
+```bash
+aka prune --dry-run       # report what would be freed
+aka prune                 # clear prompt/reply/tool/file text past the retention horizon
+aka prune --days 14       # override the horizon for this run
+```
+
+Every event row and finding is kept; only the raw text is cleared. `aka prune` is a no-op
+unless body expiry is switched on in settings (`bodyRetention`, off by default) — it is not a
+way to bypass that. It doesn't appear in `aka --help`.
 
 ---
 

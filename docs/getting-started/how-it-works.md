@@ -70,7 +70,7 @@ before the content reaches the model (prompts, tool inputs) or after it responds
 Every event is scanned against your installed rule packs. 
 
 * Most rules match with **regex** — a pattern shaped like an AWS access key, an email address, a bank routing number — since that covers the majority of secrets and PII, which have a predictable shape. 
-* A smaller set of rules match on **keyword** presence (contextual phrases like "[REDACTED:PII] is"), and some regex matches pass through a **post-match validator** — a Luhn checksum for card numbers, a Shannon-entropy check for high-entropy secrets — to cut down false positives.
+* A smaller set of rules match on **keyword** presence (contextual phrases such as `feature_flag:` or `SELECT * FROM `), and some regex matches pass through a **post-match validator** — a Luhn checksum for card numbers, a Shannon-entropy check for high-entropy secrets — to cut down false positives.
 * Either way, a match becomes a **Finding**: the rule id, category, severity, and matched span, before policy decides what happens to it. 
 
 !!! Tip
@@ -103,4 +103,4 @@ Sometimes a blocked or redacted value is legitimate such as a sandbox credential
 | **Rule**      | A JSON file describing what to detect: keyword list, regex pattern, or validator |
 | **Rule Pack** | A directory of rules + mandatory fixtures with a `manifest.json` |
 | **Policy**    | A decision: what action to take when a rule or category fires |
-| **Plugin**    | The harness extension (hooks) that intercepts sessions — one package per host (Claude Code/Desktop share one; Codex, Antigravity, and the browser extension have their own), all writing the same local store |
+| **Plugin**    | The harness extension (hooks) that intercepts sessions — one package per host (Claude Code/Desktop share one; Codex, Antigravity, GitHub Copilot, and the browser extension have their own), all writing the same local store |
