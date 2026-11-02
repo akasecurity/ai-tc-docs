@@ -9,23 +9,22 @@ site_dir: site
 theme:
   name: material
   custom_dir: overrides
-  # Fonts are loaded manually via extra_css (Hanken Grotesk / Public Sans /
-  # Geist Mono, matching akasecurity.io); disable Material's Roboto autoload.
+  # ds-v1 fonts are self-hosted from docs/assets/fonts (base.css); no Roboto autoload.
   font: false
-  logo: assets/icon.svg
+  logo: assets/icon-white.svg
   favicon: assets/logomark.svg
   palette:
     - media: '(prefers-color-scheme: light)'
       scheme: default
-      primary: black
-      accent: teal
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - media: '(prefers-color-scheme: dark)'
       scheme: slate
-      primary: black
-      accent: teal
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
@@ -90,9 +89,9 @@ extra:
       github: GitHub (giscus comments)
 
 extra_css:
-  - https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700&family=Public+Sans:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap
-  - stylesheets/extra.css
+  - stylesheets/base.css
   - stylesheets/home.css
+  - stylesheets/e.css
 
 nav:
   - Home: index.md

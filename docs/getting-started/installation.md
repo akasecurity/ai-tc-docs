@@ -223,9 +223,9 @@ AKA asks again rather than holding you to terms you never saw.
 
 ## Verify it's working
 
-Submit a prompt containing a fake credential — the same shape a real secrets rule would match — and confirm AKA blocks it. See the fixtures in `rules/secrets/` for a concrete example payload.
+Submit a prompt containing a fake credential — the same shape a real secrets rule would match. See the fixtures in `rules/secrets/` for a concrete example payload.
 
-You should see a block message referencing `secrets/aws-access-key`. Then run `/aka:findings` or `/aka:health` to see it recorded.
+On a new install the secrets pack starts on **warn**, so you should see `AKA flagged sensitive content (secrets/aws-access-key) — sent unchanged.` Promote the detection to block from the dashboard to stop it instead. Then run `/aka:findings` or `/aka:health` to see it recorded.
 
 ## Open the dashboard
 
