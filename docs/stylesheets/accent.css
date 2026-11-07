@@ -1,0 +1,2 @@
+/* AI Traffic Control and marketplace (AKA green, the default) accent. Copy to docs/stylesheets/accent.css. */
+:root { --aka-accent: #00E0B8; --aka-accent-ink: #0A7A67; --aka-accent-bright: #00E0B8; }
