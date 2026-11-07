@@ -81,6 +81,7 @@
 [data-md-color-scheme="slate"] .md-typeset table:not([class]) th { background: var(--aka-coal); }
 .md-typeset table:not([class]) td { border-top: 1px solid var(--aka-line); vertical-align: top; }
 .md-typeset table:not([class]) td:last-child code { white-space: nowrap; }
+.md-typeset table:not([class]) td:first-child code { white-space: nowrap; font-size: .8em; }  /* v1.1: first-column names (SessionStart, PostModelSwitch) never break mid-word */
 
 /* ---- code ---- */
 .md-typeset code { border-radius: 4px; }
