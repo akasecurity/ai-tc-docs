@@ -10,7 +10,7 @@
     <ul>
       {%- set sites = [("AI Traffic Control", "https://akasecurity.github.io/ai-tc-docs/"), ("oUpdate", "https://akasecurity.github.io/oUpdate-docs/")] -%}
       {%- for name, url in sites %}
-      <li><a href="{{ url }}"{% if config.site_url and config.site_url.startswith(url) %} aria-current="page"{% endif %}>{{ name }}</a></li>
+      <li><a href="{{ url }}"{% if config.site_url and config.site_url.startswith(url) %} aria-current="true"{% endif %}>{{ name }}</a></li>
       {%- endfor %}
     </ul>
   </nav>
