@@ -1,4 +1,4 @@
-/* AKA docs theme v1.4. One file for every AKA docs site (MkDocs Material 9.x).
+/* AKA docs theme v1.4.1. One file for every AKA docs site (MkDocs Material 9.x).
    Flat: no gradients, no shadows, no glow. Change the accent in accent.css only.
    Fonts: Hanken Grotesk (headings), Public Sans (body), Geist Mono (code).
    The three .woff2 files go in docs/assets/fonts/ (new sites copy them from an existing AKA docs site; sites that already have them keep them). */
@@ -113,7 +113,7 @@
 .md-typeset .tabbed-labels > label { font: 500 .68rem/1 "Public Sans", sans-serif; color: var(--aka-fg2); }
 .md-typeset .tabbed-labels:before { background: var(--aka-accent) !important; height: 2px; }
 [data-md-color-scheme="slate"] .md-typeset .tabbed-labels > label { color: var(--aka-silver); }  /* v1.3: inactive tab labels were about 2.9:1 on slate */
-.md-typeset .tabbed-labels a { text-decoration: none; }  /* v1.4: Material 9.7 wraps tab text in an a */
+.md-typeset .tabbed-labels a:not(.md-button):not(.headerlink) { text-decoration: none; }  /* v1.4: Material 9.7 wraps tab text in an a */
 .md-typeset .tabbed-set > input:checked + label { color: var(--md-default-fg-color); }
 
 /* ---- buttons ---- */
@@ -149,9 +149,9 @@
 .md-typeset .aka-hero .md-button { margin: 0; color: #FFFFFF; border-color: rgba(255,255,255,.45); }
 .md-typeset .aka-hero .md-button--primary { color: var(--aka-coal); border-color: var(--aka-accent); }
 .md-typeset .aka-hero .md-button--primary:hover { color: #FFFFFF; border-color: var(--aka-accent-ink); }  /* v1.4: hover was coal on accent-ink, 2.4:1 */
-[data-md-color-scheme="slate"] .md-typeset .md-button:not(.md-button--primary):hover { color: var(--aka-coal); }  /* v1.4: outline button hover on dark */
+[data-md-color-scheme="slate"] .md-typeset .md-button:not(.md-button--primary):hover { color: var(--md-accent-bg-color); border-color: var(--aka-accent-bright); }  /* v1.4: outline button hover on dark */
 .aka-cta > p { display: flex; flex-wrap: wrap; gap: .6rem; margin: 0; }  /* v1.4: markdown wraps both hero buttons in one p */
-.aka-hero p:has(> .eyebrow) { margin: 0; }  /* v1.4: the label p added its own margin to the eyebrow's */
+.aka-hero p:has(> .eyebrow) { margin: 0; }  /* v1.4: the label p's margin was the 1.4rem of .aka-hero p; the eyebrow's own 1rem is the gap now */
 .aka-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.6rem; margin: 0 0 2rem; }
 .aka-facts > div { border-top: 2px solid var(--aka-accent); padding-top: .7rem; }
 .aka-facts h3 { margin: 0 0 .3rem; }
