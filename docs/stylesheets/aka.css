@@ -1,4 +1,4 @@
-/* AKA docs theme v1.3. One file for every AKA docs site (MkDocs Material 9.x).
+/* AKA docs theme v1.4.4. One file for every AKA docs site (MkDocs Material 9.x).
    Flat: no gradients, no shadows, no glow. Change the accent in accent.css only.
    Fonts: Hanken Grotesk (headings), Public Sans (body), Geist Mono (code).
    The three .woff2 files go in docs/assets/fonts/ (new sites copy them from an existing AKA docs site; sites that already have them keep them). */
@@ -31,6 +31,7 @@
 }
 /* ---- dark ---- */
 [data-md-color-scheme="slate"] {
+  --md-accent-bg-color: var(--aka-coal-deep);  /* v1.4: back-to-top hover was white on the accent, 1.7:1 */
   --md-primary-fg-color: var(--aka-coal); --md-primary-fg-color--dark: var(--aka-coal-deep); --md-primary-bg-color: #FFFFFF;
   --md-default-bg-color: var(--aka-coal-deep); --md-default-fg-color: #FFFFFF; --md-default-fg-color--light: rgba(255,255,255,.72);
   --md-typeset-color: var(--aka-silver); --md-typeset-a-color: var(--aka-accent-bright); --md-accent-fg-color: var(--aka-accent-bright); --md-accent-fg-color--transparent: color-mix(in srgb, var(--aka-accent-bright) 14%, transparent);
@@ -91,6 +92,7 @@
 .md-typeset code { border-radius: 4px; }
 .md-typeset pre > code { border: 1px solid var(--aka-line); border-radius: var(--aka-radius); }
 .md-typeset .highlight .filename, .md-typeset .highlight span.filename { background: var(--aka-offwhite); border-bottom: 1px solid var(--aka-line); }
+[data-md-color-scheme="slate"] .md-typeset .highlight .filename, [data-md-color-scheme="slate"] .md-typeset .highlight span.filename { background: var(--aka-coal); color: var(--aka-silver); }  /* v1.4: titled code blocks on dark */
 
 /* ---- callouts: one calm plate, a 4px edge in the tone color ---- */
 .md-typeset .admonition, .md-typeset details { border: 1px solid var(--aka-line-strong); border-left: 4px solid var(--aka-accent); border-radius: var(--aka-radius); background: var(--aka-offwhite); font-size: .74rem; overflow: hidden; }
@@ -111,13 +113,15 @@
 .md-typeset .tabbed-labels > label { font: 500 .68rem/1 "Public Sans", sans-serif; color: var(--aka-fg2); }
 .md-typeset .tabbed-labels:before { background: var(--aka-accent) !important; height: 2px; }
 [data-md-color-scheme="slate"] .md-typeset .tabbed-labels > label { color: var(--aka-silver); }  /* v1.3: inactive tab labels were about 2.9:1 on slate */
+.md-typeset .tabbed-labels a:not(.md-button):not(.headerlink) { text-decoration: none; }  /* v1.4.1: Material 9.7 wraps tab text in an a; the :not() pair is only there to out-rank the global link rule */
 .md-typeset .tabbed-set > input:checked + label { color: var(--md-default-fg-color); }
 
 /* ---- buttons ---- */
 .md-typeset .md-button { border: 1.5px solid var(--aka-coal); border-radius: 999px; color: var(--aka-coal); font-weight: 600; }
 .md-typeset .md-button--primary { background: var(--aka-accent); border-color: var(--aka-accent); color: var(--aka-coal); }
-.md-typeset .md-button--primary:hover { background: var(--aka-accent-ink); border-color: var(--aka-accent-ink); color: #FFFFFF; }
+.md-typeset .md-button--primary:is(:hover, :focus) { background: var(--aka-accent-ink); border-color: var(--aka-accent-ink); color: #FFFFFF; }
 [data-md-color-scheme="slate"] .md-typeset .md-button:not(.md-button--primary) { border-color: rgba(255,255,255,.45); color: #FFFFFF; }
+[data-md-color-scheme="slate"] .md-typeset .md-button:not(.md-button--primary):is(:hover, :focus) { color: var(--md-accent-bg-color); border-color: var(--aka-accent-bright); }  /* v1.4: outline button hover on dark */
 
 /* ---- cookie notice (only where a site loads comments): small card, no backdrop ---- */
 .md-consent__overlay { background: transparent !important; backdrop-filter: none !important; pointer-events: none; }
@@ -145,6 +149,10 @@
 .aka-hero .aka-cta { display: flex; flex-wrap: wrap; gap: .6rem; }
 .md-typeset .aka-hero .md-button { margin: 0; color: #FFFFFF; border-color: rgba(255,255,255,.45); }
 .md-typeset .aka-hero .md-button--primary { color: var(--aka-coal); border-color: var(--aka-accent); }
+.md-typeset .aka-hero .md-button--primary:is(:hover, :focus) { background: var(--aka-accent-ink); color: #FFFFFF; border-color: var(--aka-accent-ink); }  /* v1.4.4: focus has the same fill as hover, on dark pages too */  /* v1.4.2: hover and keyboard focus were coal on accent-ink, 2.6:1 or less */
+.md-typeset .aka-hero .md-button:not(.md-button--primary):is(:hover, :focus) { border-color: var(--md-accent-fg-color); }  /* v1.4.3: light mode kept the see-through white border on hover */
+.aka-cta > p { display: flex; flex-wrap: wrap; gap: .6rem; margin: 0; }  /* v1.4: markdown wraps both hero buttons in one p */
+.aka-hero p:has(> .eyebrow) { margin: 0; }  /* v1.4: the label p's margin was the 1.4rem of .aka-hero p; the eyebrow's own 1rem is the gap now */
 .aka-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.6rem; margin: 0 0 2rem; }
 .aka-facts > div { border-top: 2px solid var(--aka-accent); padding-top: .7rem; }
 .aka-facts h3 { margin: 0 0 .3rem; }
