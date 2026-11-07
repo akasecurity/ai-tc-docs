@@ -1,0 +1,313 @@
+/* Diagram styles (flow and architecture SVGs, terminal bars). */
+
+:root {
+  --aka-green: #00e0b8;
+  --aka-mint: #cefcf4;
+  --aka-cloud: #a0e7ff;
+  --aka-fg3: #9aaabb;
+  --aka-red: #f76f68;
+  --aka-amber: #f7bd00;
+}
+
+@media screen and (max-width: 59.9375em) {
+  .mdx-flagship__card {
+    grid-template-columns: 1fr;
+  }
+  .mdx-flagship__visual {
+    order: 2;
+  }
+  .mdx-flagship__copy {
+    order: 1;
+  }
+}
+
+.mdx-flagship__visual {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.8rem;
+  overflow: hidden;
+}
+
+.mdx-flow__bar {
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: 'Geist Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
+  color: #9aaabb;
+}
+
+.mdx-flow__body {
+  padding: 0.9rem;
+}
+
+.mdx-flow__body svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  font-family: 'Geist Mono', ui-monospace, monospace;
+}
+
+.mdx-flow__node {
+  fill: rgba(255, 255, 255, 0.04);
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 1.5;
+}
+
+.mdx-flow__node-label {
+  font-size: 11px;
+  text-anchor: middle;
+  fill: rgba(255, 255, 255, 0.78);
+}
+
+.mdx-flow__control {
+  fill: rgba(0, 224, 184, 0.12);
+  stroke: var(--aka-green);
+  stroke-width: 1.5;
+}
+
+.mdx-flow__control-label {
+  font-size: 15px;
+  font-weight: 600;
+  text-anchor: middle;
+  fill: var(--aka-green);
+}
+
+.mdx-flow__control-sub {
+  font-size: 9px;
+  text-anchor: middle;
+  fill: rgba(255, 255, 255, 0.6);
+}
+
+.mdx-flow__arrow {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.25);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-dasharray: 3 4;
+  animation: mdx-flow-move 1s linear infinite;
+}
+
+@keyframes mdx-flow-move {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mdx-flow__arrow {
+    animation: none;
+  }
+}
+
+.mdx-flow__arrowhead {
+  fill: rgba(255, 255, 255, 0.25);
+}
+
+.mdx-flow__outcome-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.mdx-flow__outcome--monitor {
+  fill: rgba(0, 224, 184, 0.12);
+  stroke: var(--aka-green);
+  stroke-width: 1.5;
+}
+
+.mdx-flow__outcome-label--monitor {
+  fill: var(--aka-green);
+}
+
+.mdx-flow__outcome--warn {
+  fill: rgba(247, 189, 0, 0.12);
+  stroke: var(--aka-amber);
+  stroke-width: 1.5;
+}
+
+.mdx-flow__outcome-label--warn {
+  fill: var(--aka-amber);
+}
+
+.mdx-flow__outcome--redact {
+  fill: rgba(160, 231, 255, 0.12);
+  stroke: var(--aka-cloud);
+  stroke-width: 1.5;
+}
+
+.mdx-flow__outcome-label--redact {
+  fill: var(--aka-cloud);
+}
+
+.mdx-flow__outcome--block {
+  fill: rgba(247, 111, 104, 0.12);
+  stroke: var(--aka-red);
+  stroke-width: 1.5;
+}
+
+.mdx-flow__outcome-label--block {
+  fill: var(--aka-red);
+}
+
+.mdx-flow__outcome--exception {
+  fill: rgba(154, 170, 187, 0.14);
+  stroke: var(--aka-fg3);
+  stroke-width: 1.5;
+}
+
+.mdx-flow__outcome-label--exception {
+  fill: var(--aka-fg3);
+}
+
+.mdx-terminal__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mdx-terminal__bar span {
+  margin-left: 0.4rem;
+  font-size: 0.7rem;
+  color: #6f819a;
+  font-family: 'Geist Mono', ui-monospace, monospace;
+}
+
+.mdx-local__card .mdx-diagram {
+  grid-area: diagram;
+}
+
+.mdx-diagram {
+  background: var(--md-default-bg-color, #fff);
+  border: 1px solid var(--aka-line);
+  border-radius: 0.8rem;
+  overflow: hidden;
+  box-shadow: 0 20px 40px -18px rgba(35, 47, 62, 0.16);
+}
+
+[data-md-color-scheme='slate'] .mdx-diagram {
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 20px 40px -18px rgba(0, 0, 0, 0.5);
+}
+
+.mdx-diagram__bar {
+  border-bottom: 1.5px solid var(--aka-line);
+}
+
+[data-md-color-scheme='slate'] .mdx-diagram__bar {
+  border-bottom-color: rgba(255, 255, 255, 0.14);
+}
+
+.mdx-diagram__bar span {
+  margin-left: 0;
+  color: var(--aka-fg2);
+}
+
+.mdx-diagram__body {
+  padding: 1rem;
+}
+
+.mdx-diagram__body svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  font-family: 'Geist Mono', ui-monospace, monospace;
+}
+
+.mdx-diagram__boundary {
+  fill: none;
+  stroke: var(--aka-line);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 5;
+}
+
+[data-md-color-scheme='slate'] .mdx-diagram__boundary {
+  stroke: rgba(255, 255, 255, 0.2);
+}
+
+.mdx-diagram__boundary-label {
+  font-size: 11px;
+  fill: var(--aka-fg2);
+}
+
+.mdx-diagram__node {
+  fill: var(--aka-offwhite);
+  stroke: var(--aka-coal);
+  stroke-width: 1.5;
+}
+
+[data-md-color-scheme='slate'] .mdx-diagram__node {
+  fill: rgba(255, 255, 255, 0.04);
+  stroke: rgba(255, 255, 255, 0.35);
+}
+
+.mdx-diagram__node--accent {
+  fill: var(--aka-mint);
+  stroke: #0c8d77;
+}
+
+[data-md-color-scheme='slate'] .mdx-diagram__node--accent {
+  fill: rgba(0, 224, 184, 0.12);
+  stroke: var(--aka-green);
+}
+
+.mdx-diagram__node-label {
+  font-size: 13px;
+  font-weight: 600;
+  text-anchor: middle;
+  fill: var(--aka-coal);
+}
+
+[data-md-color-scheme='slate'] .mdx-diagram__node-label {
+  fill: #fff;
+}
+
+.mdx-diagram__node-label--accent {
+  fill: #0c8d77;
+}
+
+[data-md-color-scheme='slate'] .mdx-diagram__node-label--accent {
+  fill: var(--aka-green);
+}
+
+.mdx-diagram__node-sub {
+  font-size: 10px;
+  text-anchor: middle;
+  fill: var(--aka-fg2);
+}
+
+[data-md-color-scheme='slate'] .mdx-diagram__node-sub {
+  fill: rgba(255, 255, 255, 0.6);
+}
+
+.mdx-diagram__arrow {
+  stroke: var(--aka-fg3);
+  stroke-width: 1.5;
+}
+
+[data-md-color-scheme='slate'] .mdx-diagram__arrow {
+  stroke: rgba(255, 255, 255, 0.3);
+}
+
+.mdx-diagram__arrowhead {
+  fill: var(--aka-fg3);
+}
+
+[data-md-color-scheme='slate'] .mdx-diagram__arrowhead {
+  fill: rgba(255, 255, 255, 0.3);
+}
+
+.mdx-diagram__arrow-label {
+  font-size: 10px;
+  fill: var(--aka-fg2);
+}
+
+[data-md-color-scheme='slate'] .mdx-diagram__bar span {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+[data-md-color-scheme='slate'] .mdx-diagram__boundary-label,
+[data-md-color-scheme='slate'] .mdx-diagram__arrow-label {
+  fill: rgba(255, 255, 255, 0.6);
+}

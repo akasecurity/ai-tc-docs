@@ -1,0 +1,18 @@
+{#- AKA docs footer block. Put this file at overrides/partials/copyright.html and set theme.custom_dir: overrides.
+    Edit nothing but the page links if a sibling site moves. The current site gets aria-current. -#}
+<div class="aka-foot">
+  <div>
+    <img src="{{ 'assets/aka-lockup-white.svg' | url }}" alt="AKA Security">
+    <p>{{ config.site_name }} is part of AKA Security's open-source work.</p>
+  </div>
+  <nav aria-label="AKA docs">
+    <p class="aka-foot-title">AKA docs</p>
+    <ul>
+      {%- set sites = [("AI Traffic Control", "https://akasecurity.github.io/ai-tc-docs/"), ("oUpdate", "https://akasecurity.github.io/oUpdate-docs/")] -%}
+      {%- for name, url in sites %}
+      <li><a href="{{ url }}"{% if config.site_url and config.site_url.startswith(url) %} aria-current="page"{% endif %}>{{ name }}</a></li>
+      {%- endfor %}
+    </ul>
+  </nav>
+  <p class="fine">&copy; AKA Security. Built with Material for MkDocs.</p>
+</div>

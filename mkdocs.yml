@@ -9,9 +9,9 @@ site_dir: site
 theme:
   name: material
   custom_dir: overrides
-  # ds-v1 fonts are self-hosted from docs/assets/fonts (base.css); no Roboto autoload.
+  # ds-v1 fonts are self-hosted from docs/assets/fonts (aka.css); no Roboto autoload.
   font: false
-  logo: assets/icon-white.svg
+  logo: assets/aka-lockup-white.svg
   favicon: assets/logomark.svg
   palette:
     - media: '(prefers-color-scheme: light)'
@@ -36,6 +36,7 @@ theme:
     - navigation.footer
     - content.code.copy
     - content.code.annotate
+    - content.tabs.link
     - search.suggest
     - search.highlight
     - toc.follow
@@ -89,9 +90,10 @@ extra:
       github: GitHub (giscus comments)
 
 extra_css:
-  - stylesheets/base.css
-  - stylesheets/home.css
-  - stylesheets/e.css
+  - stylesheets/aka.css
+  - stylesheets/accent.css
+  - stylesheets/home-cover.css
+  - stylesheets/diagrams.css
 
 nav:
   - Home: index.md
