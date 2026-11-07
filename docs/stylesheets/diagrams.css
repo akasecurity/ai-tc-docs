@@ -302,3 +302,12 @@
   font-size: 10px;
   fill: var(--aka-fg2);
 }
+
+[data-md-color-scheme='slate'] .mdx-diagram__bar span {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+[data-md-color-scheme='slate'] .mdx-diagram__boundary-label,
+[data-md-color-scheme='slate'] .mdx-diagram__arrow-label {
+  fill: rgba(255, 255, 255, 0.6);
+}

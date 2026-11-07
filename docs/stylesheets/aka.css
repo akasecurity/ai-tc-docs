@@ -1,4 +1,4 @@
-/* AKA docs theme v1.2. One file for every AKA docs site (MkDocs Material 9.x).
+/* AKA docs theme v1.3. One file for every AKA docs site (MkDocs Material 9.x).
    Flat: no gradients, no shadows, no glow. Change the accent in accent.css only.
    Fonts: Hanken Grotesk (headings), Public Sans (body), Geist Mono (code).
    The three .woff2 files go in docs/assets/fonts/ (new sites copy them from an existing AKA docs site; sites that already have them keep them). */
@@ -110,6 +110,7 @@
 .md-typeset .tabbed-labels { box-shadow: inset 0 -1px 0 var(--aka-line-strong); }
 .md-typeset .tabbed-labels > label { font: 500 .68rem/1 "Public Sans", sans-serif; color: var(--aka-fg2); }
 .md-typeset .tabbed-labels:before { background: var(--aka-accent) !important; height: 2px; }
+[data-md-color-scheme="slate"] .md-typeset .tabbed-labels > label { color: var(--aka-silver); }  /* v1.3: inactive tab labels were about 2.9:1 on slate */
 .md-typeset .tabbed-set > input:checked + label { color: var(--md-default-fg-color); }
 
 /* ---- buttons ---- */
@@ -128,7 +129,7 @@
 .md-footer__title { font-family: "Hanken Grotesk", sans-serif; }
 .aka-foot { margin: 0 .6rem; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr); gap: 2rem; padding: 1.6rem 0 1.2rem; color: rgba(255,255,255,.72); font-size: .66rem; line-height: 1.6; }
 .aka-foot img { height: 1.1rem; width: auto; display: block; margin-bottom: .6rem; }
-.aka-foot h2 { margin: 0 0 .5rem; font: 600 .56rem/1.2 "Public Sans", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.6); }
+.aka-foot h2, .aka-foot .aka-foot-title { margin: 0 0 .5rem; font: 600 .56rem/1.2 "Public Sans", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.6); }
 .md-footer-meta .aka-foot ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .3rem 1.4rem; }
 .md-footer-meta .aka-foot li { margin: 0; }
 .md-footer-meta.md-typeset .aka-foot a { color: #FFFFFF; text-decoration: none; }
