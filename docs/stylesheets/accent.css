@@ -1,2 +1,2 @@
-/* AI Traffic Control and marketplace (AKA green, the default) accent. Copy to docs/stylesheets/accent.css. */
+/* AI Traffic Control and marketplace (AKA green, the default) accent. Use as docs/stylesheets/accent.css (a site that already has one keeps its own and edits the three values). */
 :root { --aka-accent: #00E0B8; --aka-accent-ink: #0A7A67; --aka-accent-bright: #00E0B8; }

@@ -1,7 +1,7 @@
-/* AKA docs theme v1. One file for every AKA docs site (MkDocs Material 9.x).
+/* AKA docs theme v1.2. One file for every AKA docs site (MkDocs Material 9.x).
    Flat: no gradients, no shadows, no glow. Change the accent in accent.css only.
    Fonts: Hanken Grotesk (headings), Public Sans (body), Geist Mono (code).
-   Copy docs/assets/fonts/*.woff2 from an existing AKA docs site. */
+   The three .woff2 files go in docs/assets/fonts/ (new sites copy them from an existing AKA docs site; sites that already have them keep them). */
 @font-face { font-family: "Hanken Grotesk"; src: url("../assets/fonts/hanken-grotesk-latin.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 @font-face { font-family: "Public Sans"; src: url("../assets/fonts/public-sans-latin.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
 @font-face { font-family: "Geist Mono"; src: url("../assets/fonts/geist-mono-latin.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
@@ -24,7 +24,7 @@
 [data-md-color-scheme="default"] {
   --md-primary-fg-color: var(--aka-coal); --md-primary-fg-color--light: #2C3A4B; --md-primary-fg-color--dark: var(--aka-coal-deep);
   --md-primary-bg-color: #FFFFFF; --md-primary-bg-color--light: rgba(255,255,255,.72);
-  --md-accent-fg-color: var(--aka-accent-ink); --md-accent-fg-color--transparent: transparent; --md-accent-bg-color: #FFFFFF;
+  --md-accent-fg-color: var(--aka-accent-ink); --md-accent-fg-color--transparent: color-mix(in srgb, var(--aka-accent) 14%, transparent); --md-accent-bg-color: #FFFFFF;
   --md-typeset-a-color: var(--aka-accent-ink);
   --md-default-fg-color: var(--aka-coal); --md-default-fg-color--light: var(--aka-fg2); --md-typeset-color: var(--aka-fg1);
   --md-code-bg-color: var(--aka-offwhite); --md-code-fg-color: var(--aka-coal);
@@ -33,7 +33,7 @@
 [data-md-color-scheme="slate"] {
   --md-primary-fg-color: var(--aka-coal); --md-primary-fg-color--dark: var(--aka-coal-deep); --md-primary-bg-color: #FFFFFF;
   --md-default-bg-color: var(--aka-coal-deep); --md-default-fg-color: #FFFFFF; --md-default-fg-color--light: rgba(255,255,255,.72);
-  --md-typeset-color: var(--aka-silver); --md-typeset-a-color: var(--aka-accent-bright); --md-accent-fg-color: var(--aka-accent-bright);
+  --md-typeset-color: var(--aka-silver); --md-typeset-a-color: var(--aka-accent-bright); --md-accent-fg-color: var(--aka-accent-bright); --md-accent-fg-color--transparent: color-mix(in srgb, var(--aka-accent-bright) 14%, transparent);
   --md-code-bg-color: var(--aka-coal-deepest); --md-code-fg-color: var(--aka-silver);
   --aka-line: rgba(255,255,255,.14); --aka-line-strong: rgba(255,255,255,.24);
   --aka-warn-fg: #F7D45C; --aka-warn-bg: rgba(247,212,92,.12); --aka-stop-fg: #FF9D97; --aka-stop-bg: rgba(247,111,104,.14);
@@ -50,8 +50,12 @@
 .md-header__title { margin-left: .2rem; }
 .md-header__topic:first-child { top: 0; bottom: 0; align-items: center; }
 .md-header__topic:first-child .md-ellipsis { font: 500 .85rem/1.2rem "Hanken Grotesk", sans-serif; letter-spacing: -.005em; padding-left: .8rem; border-left: 1px solid rgba(255,255,255,.28); }
-[data-md-color-scheme] .md-search__input { background: rgba(255,255,255,.1); color: #FFFFFF; border-radius: var(--aka-radius); }
-[data-md-color-scheme] .md-search__input::placeholder, [data-md-color-scheme] .md-search__icon { color: rgba(255,255,255,.7); }
+[data-md-color-scheme] .md-search__input { background: rgba(255,255,255,.1); border-radius: var(--aka-radius); }
+/* white text only while the search box is closed (on the coal header); open, the box is light in light mode */
+[data-md-toggle="search"]:not(:checked) ~ .md-header .md-search__input { color: #FFFFFF; }
+[data-md-toggle="search"]:not(:checked) ~ .md-header .md-search__input::placeholder, [data-md-toggle="search"]:not(:checked) ~ .md-header .md-search__icon { color: rgba(255,255,255,.7); }
+[data-md-toggle="search"]:checked ~ .md-header .md-search__input { color: var(--md-default-fg-color); }
+[data-md-toggle="search"]:checked ~ .md-header .md-search__input::placeholder { color: var(--md-default-fg-color--light); }
 
 /* ---- tabs: plain names, one solid accent rule under the active one ---- */
 .md-tabs { background: var(--aka-coal); border-top: 1px solid rgba(255,255,255,.08); }
@@ -127,9 +131,8 @@
 .aka-foot h2 { margin: 0 0 .5rem; font: 600 .56rem/1.2 "Public Sans", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.6); }
 .md-footer-meta .aka-foot ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: .3rem 1.4rem; }
 .md-footer-meta .aka-foot li { margin: 0; }
-.aka-foot a { color: #FFFFFF; text-decoration: none; }
-.aka-foot a:hover { color: var(--aka-accent-bright); }
-.aka-foot a[aria-current] { color: var(--aka-accent-bright); }
+.md-footer-meta.md-typeset .aka-foot a { color: #FFFFFF; text-decoration: none; }
+.md-footer-meta.md-typeset .aka-foot a:hover, .md-footer-meta.md-typeset .aka-foot a[aria-current] { color: var(--aka-accent-bright); }
 .aka-foot .fine { grid-column: 1 / -1; padding-top: .8rem; border-top: 1px solid rgba(255,255,255,.14); font-size: .6rem; color: rgba(255,255,255,.6); }
 @media screen and (max-width: 44.9375em) { .aka-foot { grid-template-columns: 1fr; } }
 
