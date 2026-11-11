@@ -90,6 +90,15 @@ Every finding resolves to one of five outcomes:
 
 Promote any detection to Warn, Redact, or Block from the dashboard, per rule or per category.
 
+## What it does not see
+
+AI Traffic Control watches the coding agent it is installed in, and nothing else. Keep these limits in mind when you decide what to rely on it for:
+
+- **Only hooked sessions.** It sees the prompts, tool calls, responses, and file reads of a supported harness that has the plugin installed. A command typed in a plain terminal, or run by an agent without the plugin, is not captured.
+- **Not network traffic.** It reads the text of what the agent is about to do, such as a shell command or a fetch. It does not inspect packets, sign-in attempts, or requests that other machines or other people's agents send to your services, so it cannot see or stop an attack that runs against your infrastructure from outside.
+- **Patterns, not behavior.** Detections match the content of a command or output. They do not measure speed or volume, so a burst of automated calls is not a finding on its own.
+- **Detect first, block by choice.** Most detections ship under Monitor or Warn. A finding is recorded, and nothing is stopped until you promote that detection to Block.
+
 ## Granting exceptions
 
 Sometimes a blocked or redacted value is legitimate such as a sandbox credential, a documented test fixture. An exception is the sanctioned way through: an explicit, audited, **exact-value** grant made from a terminal, never from inside the session it would exempt. See [Adding Exceptions](exceptions.md) for the full walkthrough.
